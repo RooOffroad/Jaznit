@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jaznit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a monthly "allowance" of standard drinks shown as dots that fill like glasses; main column for this month + logging, side column for the calendar and the step-down plan. */
+:root {
+  --bg: #edf0f5;
+  --surface: #ffffff;
+  --ink: #141c27;
+  --muted: #5a6576;
+  --line: #d6dce6;
+  --accent: #2b47c9;
+  --accent-soft: #e0e6fb;
+  --on-accent: #ffffff;
+  --good: #1d7f54;
+  --warn: #a8670f;
+  --bad: #c0352c;
+  --dot-empty: #cdd4df;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #161d28; --ink: #e6ebf2; --muted: #98a3b4; --line: #283242;
+    --accent: #8098ff; --accent-soft: #222d55; --on-accent: #0e131b;
+    --good: #52c28f; --warn: #e3a64c; --bad: #ff7b6f; --dot-empty: #323d4e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #161d28; --ink: #e6ebf2; --muted: #98a3b4; --line: #283242;
+  --accent: #8098ff; --accent-soft: #222d55; --on-accent: #0e131b;
+  --good: #52c28f; --warn: #e3a64c; --bad: #ff7b6f; --dot-empty: #323d4e;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(20px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+}
+.wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: 1.15rem; font-weight: 700; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand h1 { font-size: 1.9rem; font-weight: 700; }
+.status { font-size: 0.8rem; color: var(--muted); }
+.monthnav { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.monthnav button { border: 0; background: transparent; width: 34px; height: 34px; border-radius: 50%; font-size: 1.1rem; }
+.monthnav button:hover { background: var(--accent-soft); }
+.monthnav .m { min-width: 9.5em; text-align: center; font-weight: 600; }
+.monthnav .today-btn { width: auto; padding: 0 12px; border-radius: 999px; font-size: 0.8rem; color: var(--accent); font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* summary */
+.headline { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.big { font-family: var(--f-display); font-size: clamp(2.6rem, 7vw, 3.6rem); font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.big small { font-family: var(--f-body); font-size: 1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; border: 1px solid currentColor; }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.neutral { color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 520px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { display: flex; flex-direction: column; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
+.stat .v { font-family: var(--f-data); font-size: 1.25rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat .v.bad { color: var(--bad); } .stat .v.good { color: var(--good); }
+.dots { display: flex; flex-wrap: wrap; gap: 6px; }
+.dot { width: 15px; height: 15px; border-radius: 50%;
+  background: linear-gradient(to top, var(--c, var(--accent)) calc(var(--p, 0) * 100%), var(--dot-empty) 0); }
+.dot.over { --c: var(--bad); }
+.note { font-size: 0.85rem; color: var(--muted); }
+.week { font-size: 0.9rem; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); }
+.week.bad { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); }
+
+/* add form */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 11px; text-align: left; display: flex; flex-direction: column; gap: 0; line-height: 1.25; }
+.chip b { font-weight: 600; font-size: 0.88rem; }
+.chip span { font-size: 0.75rem; color: var(--muted); font-family: var(--f-data); }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 560px) { .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field input { font: inherit; font-family: var(--f-data); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+.field .hint { font-size: 0.76rem; color: var(--muted); }
+.stepper { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.stepper button { border: 0; background: transparent; width: 34px; font-size: 1.05rem; }
+.stepper button:hover { background: var(--accent-soft); }
+.stepper input { border: 0; border-radius: 0; text-align: center; background: transparent; padding-inline: 0; }
+.addrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.calc { font-size: 0.9rem; }
+.calc .num { font-weight: 500; }
+.primary { border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; padding: 11px 18px; border-radius: 10px; }
+.primary:hover { filter: brightness(1.08); }
+.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* entries */
+.day { display: flex; flex-direction: column; gap: 4px; }
+.dayhead { display: flex; justify-content: space-between; gap: 8px; font-size: 0.82rem; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.dayhead .heavy { color: var(--bad); font-weight: 600; }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 6px 0; }
+.entry .what { min-width: 0; }
+.entry .what b { font-weight: 500; display: block; overflow-wrap: anywhere; }
+.entry .what span { font-size: 0.8rem; color: var(--muted); }
+.entry .sd { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.del { border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 8px; width: 32px; height: 32px; font-size: 1rem; }
+.del:hover { color: var(--bad); border-color: var(--line); }
+.empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 0.9rem; text-align: center; }
+
+/* calendar */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal .dow { font-size: 0.7rem; text-align: center; color: var(--muted); font-weight: 600; letter-spacing: 0.05em; }
+.cell { aspect-ratio: 1; max-width: 100%; border: 1px solid transparent; border-radius: 8px; padding: 3px 4px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; background: var(--bg); font-size: 0.72rem; min-width: 0; }
+.cell .d { color: var(--muted); }
+.cell .t { font-family: var(--f-data); font-size: 0.8rem; font-weight: 500; align-self: flex-end; }
+.cell.has { background: color-mix(in srgb, var(--accent) var(--i), var(--surface)); }
+.cell.has.dark-ink .d, .cell.has.dark-ink .t { color: var(--on-accent); }
+.cell.heavy { border: 2px solid var(--bad); }
+.cell.free .t { color: var(--good); font-family: var(--f-body); font-size: 0.68rem; font-weight: 600; }
+.cell.today { box-shadow: inset 0 0 0 2px var(--ink); }
+.cell.future { opacity: 0.45; cursor: default; }
+.cell.blank { background: transparent; }
+button.cell:not(.future):hover { border-color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+
+/* plan */
+.ladder { display: flex; flex-direction: column; gap: 6px; }
+.rung { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 3.5em; align-items: center; gap: 10px; font-size: 0.85rem; }
+.rung .bar { height: 10px; border-radius: 5px; background: var(--dot-empty); overflow: hidden; }
+.rung .bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+.rung.cur { font-weight: 600; }
+.rung.cur .bar i { background: var(--ink); }
+.rung .v { text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.chartbox { overflow-x: auto; }
+.chartbox svg { display: block; width: 100%; min-width: 300px; height: auto; }
+.chartbox text { font-family: var(--f-data); font-size: 11px; fill: var(--muted); }
+
+details.settings summary { cursor: pointer; font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.settings summary::-webkit-details-marker { display: none; }
+details.settings summary::after { content: "+"; font-family: var(--f-data); color: var(--muted); font-size: 1.2rem; }
+details.settings[open] summary::after { content: "–"; }
+.setfields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+@media (max-width: 420px) { .setfields { grid-template-columns: minmax(0, 1fr); } }
+.setup { border: 2px solid var(--accent); }
+.setup p { margin: 0; max-width: 62ch; }
+
+footer { font-size: 0.8rem; color: var(--muted); max-width: 75ch; }
+footer a { color: var(--accent); }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 14px; font-size: 0.9rem; max-width: calc(100% - 32px); z-index: 20; }
+.toast button { border: 0; background: transparent; color: var(--accent-soft); font-weight: 600; text-decoration: underline; }
+@media (prefers-reduced-motion: no-preference) { .dot { transition: background 0.3s; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Jaznit</h1>
+      <span class="status" id="status">Connecting…</span>
+    </div>
+    <nav class="monthnav" aria-label="Choose month">
+      <button type="button" id="prevM" aria-label="Previous month">‹</button>
+      <span class="m" id="mLabel"></span>
+      <button type="button" id="nextM" aria-label="Next month">›</button>
+      <button type="button" class="today-btn" id="thisM">This month</button>
+    </nav>
+  </header>
+
+  <div id="setupSlot"></div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="sumH">
+        <div class="headline">
+          <div>
+            <div class="label" id="sumH">Standard drinks this month</div>
+            <div class="big" id="big"></div>
+          </div>
+          <span class="pill neutral" id="pill"></span>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="dots" id="dots" aria-hidden="true"></div>
+        <div class="note" id="dotNote">Each dot is one standard drink (10 g of alcohol). They fill as you log, and turn red past your target.</div>
+        <div class="week" id="week" hidden></div>
+      </section>
+
+      <section class="panel" aria-labelledby="addH">
+        <h2 id="addH">Log a drink</h2>
+        <div class="chips" id="chips" role="group" aria-label="Drink type"></div>
+        <div class="fields">
+          <label class="field" for="ml"><span class="label">Size (ml)</span><input id="ml" type="number" min="1" max="3000" step="1" inputmode="numeric"></label>
+          <label class="field" for="abv"><span class="label">Alcohol %</span><input id="abv" type="number" min="0.1" max="80" step="0.1" inputmode="decimal"></label>
+          <div class="field"><span class="label" id="countL">How many</span>
+            <div class="stepper"><button type="button" id="cMinus" aria-label="One fewer">−</button><input id="count" type="number" min="1" max="50" step="1" value="1" aria-labelledby="countL"><button type="button" id="cPlus" aria-label="One more">+</button></div>
+          </div>
+          <label class="field" for="date"><span class="label">Day</span><input id="date" type="date"></label>
+        </div>
+        <div class="addrow">
+          <div class="calc" id="calc"></div>
+          <button type="button" class="primary" id="addBtn">Log it</button>
+        </div>
+        <div class="note">Check the label on your can or bottle. Australian drinks list the number of standard drinks, and ABV varies between brands.</div>
+      </section>
+
+      <section class="panel" aria-labelledby="logH">
+        <h2 id="logH">Drinks logged</h2>
+        <div id="entries"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-labelledby="calH">
+        <h2 id="calH">By day</h2>
+        <div class="cal" id="cal"></div>
+        <div class="legend">
+          <span><i style="background: color-mix(in srgb, var(--accent) 60%, var(--surface))"></i>Darker = more drinks</span>
+          <span><i style="border: 2px solid var(--bad)"></i>Over 4 in a day</span>
+          <span style="color: var(--good); font-weight: 600">free</span><span>Alcohol-free day</span>
+        </div>
+        <div class="note">Tap a day to log a drink against it.</div>
+      </section>
+
+      <section class="panel" aria-labelledby="planH">
+        <h2 id="planH">Your step-down plan</h2>
+        <div class="ladder" id="ladder"></div>
+        <div class="note" id="planNote"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="histH">
+        <h2 id="histH">Last six months</h2>
+        <div class="chartbox" id="chart"></div>
+        <div class="legend">
+          <span><i style="background: var(--accent)"></i>Drinks logged</span>
+          <span><i style="background: var(--ink); height: 3px; vertical-align: 3px"></i>Target</span>
+        </div>
+      </section>
+
+      <div id="settingsSlot"></div>
+    </div>
+  </div>
+
+  <footer>
+    Targets use the Australian guidelines as a reference: healthy adults should drink no more than 10 standard drinks a week and no more than 4 on any one day (<a href="https://adf.org.au/reducing-risk/alcohol/alcohol-guidelines/" target="_blank" rel="noopener">NHMRC 2020, via the Alcohol and Drug Foundation</a>). A standard drink is 10 g of pure alcohol. Each drink is counted as volume in litres × ABV × 0.789 (<a href="https://www.cancervic.org.au/about-cancer/prevent-detect-cancer/prevention/limit-alcohol/standard-drink" target="_blank" rel="noopener">Cancer Council Victoria</a>). This is a tracking tool, not medical advice. If cutting back feels hard, the National Alcohol and Other Drug Hotline is 1800 250 015.
+  </footer>
+</div>
+
+<!-- settings form; moved between the setup slot and the sidebar -->
+<template id="settingsTpl">
+  <section class="panel" id="settingsPanel">
+    <div id="setupIntro">
+      <h2>Set up your plan</h2>
+      <p class="muted" style="margin-top: 6px">Tell Jaznit roughly where you are now. Your monthly target starts there and steps down each month until it reaches your end goal.</p>
+    </div>
+    <details class="settings" id="setDetails">
+      <summary>Plan settings</summary>
+    </details>
+    <div class="setfields" id="setFields">
+      <label class="field" for="sBase"><span class="label">Drinks in a typical month now</span><input id="sBase" type="number" min="1" max="1000" step="1"><span class="hint">Not sure? Count a typical week and multiply by 4.3.</span></label>
+      <label class="field" for="sCut"><span class="label">Cut each month (%)</span><input id="sCut" type="number" min="1" max="50" step="1"><span class="hint">10% is a steady pace. Bigger cuts are harder to keep up.</span></label>
+      <label class="field" for="sFloor"><span class="label">End goal per month</span><input id="sFloor" type="number" min="0" max="1000" step="1"><span class="hint">43 a month is about 10 a week, the guideline limit.</span></label>
+      <label class="field" for="sStart"><span class="label">Plan starts</span><input id="sStart" type="month"></label>
+    </div>
+    <div class="addrow" id="setupActions">
+      <div class="calc" id="setupPreview"></div>
+      <button type="button" class="primary" id="startBtn">Start my plan</button>
+    </div>
+  </section>
+</template>
+
+<div class="toast" id="toast" hidden role="status"><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>Undo</button></div>
+
+<script>
+(function () {
+  "use strict";
+  const SD_FACTOR = 0.789;
+  const LS_KEY = "jaznit.v1";
+  const pad = n => String(n).padStart(2, "0");
+  const monthKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1);
+  const dayKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const parseM = mk => mk.split("-").map(Number);
+  const addMonths = (mk, n) => { const [y, m] = parseM(mk); const d = new Date(y, m - 1 + n, 1); return monthKey(d); };
+  const monthsBetween = (a, b) => { const [ya, ma] = parseM(a); const [yb, mb] = parseM(b); return (yb - ya) * 12 + (mb - ma); };
+  const daysIn = mk => { const [y, m] = parseM(mk); return new Date(y, m, 0).getDate(); };
+  const fmt1 = n => (Math.round(n * 10) / 10).toFixed(1);
+  const fmtN = n => Number.isInteger(n) ? String(n) : fmt1(n);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const mLabel = mk => { const [y, m] = parseM(mk); return MONTHS[m - 1] + " " + y; };
+  const mShort = mk => { const [y, m] = parseM(mk); return SHORT[m - 1] + " " + String(y).slice(2); };
+  const sdOf = (ml, abv, n) => Math.round(n * (ml / 1000) * abv * SD_FACTOR * 100) / 100;
+
+  // Typical Australian serves. ABV is a common value; labels vary.
+  const PRESETS = [
+    { k: "schooner", name: "Schooner, full-strength beer", ml: 425, abv: 4.8 },
+    { k: "middy", name: "Middy, full-strength beer", ml: 285, abv: 4.8 },
+    { k: "can", name: "Can or stubby, full-strength", ml: 375, abv: 4.8 },
+    { k: "midcan", name: "Can or stubby, mid-strength", ml: 375, abv: 3.5 },
+    { k: "pint", name: "Pint, full-strength beer", ml: 570, abv: 4.8 },
+    { k: "wine", name: "Glass of wine", ml: 150, abv: 13 },
+    { k: "bottle", name: "Bottle of wine", ml: 750, abv: 13 },
+    { k: "nip", name: "Spirit nip", ml: 30, abv: 40 },
+    { k: "rtd", name: "Premix can", ml: 375, abv: 7 },
+    { k: "custom", name: "Other drink", ml: null, abv: null }
+  ];
+
+  const now = new Date();
+  const TODAY = dayKey(now);
+  const THIS_M = monthKey(now);
+  const DEFAULTS = { ready: false, baseline: 60, cut: 10, floor: 43, start: THIS_M };
+
+  let state = { settings: { ...DEFAULTS }, months: {} };
+  let view = THIS_M;
+  let mode = "connecting"; // connecting | db-loading | db | db-slow | db-error | local
+  let col = null;
+  let preset = "can";
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- local storage ----------
+  function loadLocal() {
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) { const s = JSON.parse(raw); if (s && s.settings) return s; } } catch (e) {}
+    return null;
+  }
+  function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---------- db ----------
+  const queues = {};
+  function enqueue(docId, fn) {
+    queues[docId] = (queues[docId] || Promise.resolve()).then(fn).catch(err => {
+      const code = err && err.code;
+      if (code === "invalid_argument") toast("Couldn't save. You may only have view access to this page.");
+      else if (code === "quota_exceeded") toast("Storage is full. Delete some old drinks to keep logging.");
+      else toast("Couldn't save that change. Check your connection and try again.");
+    });
+  }
+  const usingDb = () => col && mode !== "local";
+  function persistMonth(mk) {
+    if (usingDb()) {
+      enqueue("m-" + mk, () => {
+        const list = state.months[mk] || [];
+        const ref = col.doc("m-" + mk);
+        return list.length ? ref.set({ entries: list.map(e => ({ ...e })) }) : ref.delete();
+      });
+    } else saveLocal();
+  }
+  let setTimer = null;
+  function persistSettings(immediate) {
+    clearTimeout(setTimer);
+    const go = () => {
+      if (usingDb()) enqueue("settings", () => col.doc("settings").set({ ...state.settings }));
+      else saveLocal();
+    };
+    if (immediate) go(); else setTimer = setTimeout(go, 600);
+  }
+
+  async function connect() {
+    const c = window.claude;
+    if (!c || typeof c.use !== "function") return toLocal();
+    try {
+      const [db, user] = await Promise.all([c.use("db"), c.use("user")]);
+      const uid = user ? await user.id() : null;
+      if (!db || !uid) return toLocal();
+      col = db.collection("data/users/" + uid);
+      mode = "db-loading"; renderStatus();
+      const timer = setTimeout(() => { if (mode === "db-loading") { mode = "db-slow"; renderStatus(); } }, 10000);
+      col.onSnapshot(snap => {
+        const next = { settings: { ...DEFAULTS }, months: {} };
+        snap.docs.forEach(d => {
+          const data = d.data() || {};
+          if (d.id === "settings") next.settings = { ...DEFAULTS, ...data };
+          else if (d.id.startsWith("m-") && Array.isArray(data.entries)) next.months[d.id.slice(2)] = data.entries.map(e => ({ ...e }));
+        });
+        state = next;
+        if (!snap.metadata.fromCache) { clearTimeout(timer); mode = "db"; }
+        syncSettingsInputs();
+        render();
+      }, () => { clearTimeout(timer); mode = "db-error"; renderStatus(); });
+    } catch (e) { toLocal(); }
+  }
+  function toLocal() {
+    mode = "local";
+    const s = loadLocal();
+    if (s) { state = { settings: { ...DEFAULTS, ...s.settings }, months: s.months || {} }; syncSettingsInputs(); }
+    render();
+  }
+
+  // ---------- model ----------
+  function targetFor(mk) {
+    const s = state.settings;
+    const steps = monthsBetween(s.start, mk);
+    if (steps < 0) return null;
+    const b = Math.max(0, +s.baseline || 0), f = Math.max(0, +s.floor || 0), cut = Math.min(90, Math.max(0, +s.cut || 0));
+    if (b <= f) return Math.round(b);
+    return Math.max(Math.round(f), Math.round(b * Math.pow(1 - cut / 100, steps)));
+  }
+  const entriesOf = mk => state.months[mk] || [];
+  const usedFor = mk => entriesOf(mk).reduce((a, e) => a + (+e.sd || 0), 0);
+  function dayTotals(mk) {
+    const t = {};
+    entriesOf(mk).forEach(e => { t[e.d] = (t[e.d] || 0) + (+e.sd || 0); });
+    return t;
+  }
+  function last7() {
+    let total = 0;
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    const from = dayKey(start);
+    [monthKey(start), THIS_M].filter((v, i, a) => a.indexOf(v) === i).forEach(mk => {
+      entriesOf(mk).forEach(e => { if (e.d >= from && e.d <= TODAY) total += +e.sd || 0; });
+    });
+    return total;
+  }
+
+  // ---------- render ----------
+  function renderStatus() {
+    const msg = {
+      "connecting": "Connecting…",
+      "db-loading": "Loading your log…",
+      "db": "Saved to your account, private to you",
+      "db-slow": "Can't reach your saved log yet. What you see may be out of date.",
+      "db-error": "Lost connection to your saved log. Reload the page to reconnect.",
+      "local": "Saved in this browser only"
+    }[mode];
+    $("status").textContent = msg;
+  }
+
+  function render() {
+    renderStatus();
+    $("mLabel").textContent = mLabel(view);
+    $("thisM").hidden = view === THIS_M;
+    renderSetupPlacement();
+    renderSummary();
+    renderCalendar();
+    renderEntries();
+    renderLadder();
+    renderChart();
+    renderSetupPreview();
+  }
+
+  function renderSummary() {
+    const t = targetFor(view);
+    const u = usedFor(view);
+    const dim = daysIn(view);
+    const isCur = view === THIS_M, isPast = view < THIS_M;
+    const big = $("big"), pill = $("pill");
+    big.innerHTML = '<span class="num">' + fmt1(u) + "</span>" + (t != null ? "<small>of " + t + " target</small>" : "<small>no target this month</small>");
+
+    let cls = "neutral", txt = "Upcoming";
+    if (t == null) { cls = "neutral"; txt = "Before your plan"; }
+    else if (isCur) {
+      const expected = t * now.getDate() / dim;
+      if (u > t) { cls = "bad"; txt = "Over target"; }
+      else if (u > expected + 0.05) { cls = "warn"; txt = "Ahead of pace"; }
+      else { cls = "good"; txt = "On pace"; }
+    } else if (isPast) {
+      if (u > t) { cls = "bad"; txt = "Over target"; } else { cls = "good"; txt = "Under target"; }
+    }
+    pill.className = "pill " + cls; pill.textContent = txt;
+
+    const totals = dayTotals(view);
+    const lastDay = isCur ? now.getDate() : (isPast ? dim : 0);
+    let free = 0, heavy = 0;
+    for (let d = 1; d <= lastDay; d++) {
+      const v = totals[view + "-" + pad(d)] || 0;
+      if (v === 0) free++;
+      if (v > 4) heavy++;
+    }
+    const stats = [];
+    if (t != null) {
+      const rem = t - u;
+      stats.push(rem >= 0
+        ? { l: "Left this month", v: fmt1(rem) }
+        : { l: "Over target by", v: fmt1(-rem), c: "bad" });
+      if (isCur) {
+        const daysLeft = dim - now.getDate() + 1;
+        stats.push({ l: "Room per day", v: rem > 0 ? fmt1(rem / daysLeft) : "0.0", c: rem > 0 ? "" : "bad" });
+      } else stats.push({ l: "Target", v: String(t) });
+    } else {
+      stats.push({ l: "Logged", v: fmt1(u) });
+      stats.push({ l: "Plan starts", v: mShort(state.settings.start) });
+    }
+    stats.push({ l: "Alcohol-free days", v: lastDay ? free + "/" + lastDay : "–", c: free > 0 ? "good" : "" });
+    stats.push({ l: "Days over 4", v: lastDay ? String(heavy) : "–", c: heavy > 0 ? "bad" : "" });
+    $("stats").innerHTML = stats.map(s => '<div class="stat"><span class="label">' + s.l + '</span><span class="v ' + (s.c || "") + '">' + s.v + "</span></div>").join("");
+
+    // dots
+    const n = Math.min(400, Math.max(Math.ceil(t || 0), Math.ceil(u)));
+    let html = "";
+    for (let i = 0; i < n; i++) {
+      const p = Math.max(0, Math.min(1, u - i));
+      const over = t != null && i >= t;
+      html += '<span class="dot' + (over ? " over" : "") + '" style="--p:' + p.toFixed(2) + '"></span>';
+    }
+    $("dots").innerHTML = html;
+    $("dots").hidden = n === 0;
+    $("dotNote").hidden = n === 0;
+
+    const wk = $("week");
+    if (isCur) {
+      const w = last7();
+      wk.hidden = false;
+      wk.className = "week" + (w > 10 ? " bad" : "");
+      wk.innerHTML = "Last 7 days: <b class=\"num\">" + fmt1(w) + "</b> standard drinks. " + (w > 10 ? "That's over the guideline of 10 a week." : "The guideline is no more than 10 a week.");
+    } else wk.hidden = true;
+  }
+
+  function renderCalendar() {
+    const [y, m] = parseM(view);
+    const first = new Date(y, m - 1, 1);
+    const offset = (first.getDay() + 6) % 7;
+    const dim = daysIn(view);
+    const totals = dayTotals(view);
+    let html = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => '<span class="dow">' + d + "</span>").join("");
+    for (let i = 0; i < offset; i++) html += '<span class="cell blank" aria-hidden="true"></span>';
+    for (let d = 1; d <= dim; d++) {
+      const key = view + "-" + pad(d);
+      const v = totals[key] || 0;
+      const future = key > TODAY;
+      const cls = ["cell"];
+      let inner = '<span class="d">' + d + "</span>";
+      let style = "";
+      if (v > 0) {
+        const i = Math.round(18 + Math.min(v / 6, 1) * 72);
+        cls.push("has"); style = ' style="--i:' + i + '%"';
+        if (i > 55) cls.push("dark-ink");
+        inner += '<span class="t">' + fmt1(v) + "</span>";
+      } else if (!future) { cls.push("free"); inner += '<span class="t">free</span>'; }
+      if (v > 4) cls.push("heavy");
+      if (key === TODAY) cls.push("today");
+      if (future) cls.push("future");
+      const label = d + " " + MONTHS[m - 1] + ": " + (future ? "upcoming" : v > 0 ? fmt1(v) + " standard drinks" : "alcohol-free");
+      html += '<button type="button" class="' + cls.join(" ") + '"' + style + ' data-day="' + key + '" aria-label="' + label + '"' + (future ? " disabled" : "") + ">" + inner + "</button>";
+    }
+    $("cal").innerHTML = html;
+  }
+
+  function renderEntries() {
+    const list = entriesOf(view).slice().sort((a, b) => (b.d + (b.ts || "")).localeCompare(a.d + (a.ts || "")));
+    if (!list.length) {
+      $("entries").innerHTML = '<div class="empty">' + (view > THIS_M ? "This month hasn't started yet." : "Nothing logged for " + mLabel(view) + ". Pick a drink above and press Log it.") + "</div>";
+      return;
+    }
+    const groups = {};
+    list.forEach(e => { (groups[e.d] = groups[e.d] || []).push(e); });
+    $("entries").innerHTML = '<div style="display:flex;flex-direction:column;gap:14px">' + Object.keys(groups).map(d => {
+      const items = groups[d];
+      const tot = items.reduce((a, e) => a + (+e.sd || 0), 0);
+      const dt = new Date(d + "T00:00:00");
+      const head = DOW[dt.getDay()] + " " + dt.getDate() + " " + SHORT[dt.getMonth()];
+      return '<div class="day"><div class="dayhead"><span>' + head + '</span><span class="num' + (tot > 4 ? " heavy" : "") + '">' + fmt1(tot) + " std" + (tot > 4 ? " · over 4" : "") + "</span></div>" +
+        items.map(e => '<div class="entry"><div class="what"><b>' + esc(e.name) + "</b><span>" + e.n + " × " + e.ml + " ml at " + e.abv + "%</span></div>" +
+          '<span class="sd">' + fmt1(+e.sd) + '</span><button type="button" class="del" data-del="' + esc(e.id) + '" aria-label="Delete ' + esc(e.name) + '">×</button></div>').join("") +
+        "</div>";
+    }).join("") + "</div>";
+  }
+
+  function renderLadder() {
+    const s = state.settings;
+    const rows = [];
+    const startM = s.start;
+    const top = Math.max(1, targetFor(startM) || 1);
+    let reached = null;
+    for (let i = 0; i < 8; i++) {
+      const mk = addMonths(startM, i);
+      const t = targetFor(mk);
+      if (reached == null && t <= Math.round(+s.floor) && +s.baseline > +s.floor) reached = mk;
+      rows.push('<div class="rung' + (mk === THIS_M ? " cur" : "") + '"><span>' + mShort(mk) + (mk === THIS_M ? " (now)" : "") + '</span><span class="bar"><i style="width:' + Math.max(2, (t / top) * 100) + '%"></i></span><span class="v">' + t + "</span></div>");
+    }
+    $("ladder").innerHTML = rows.join("");
+    const per = (+s.floor * 7 / (365.25 / 12));
+    let note = "Monthly targets in standard drinks, starting from " + Math.round(+s.baseline) + " and cutting " + (+s.cut) + "% each month. ";
+    if (+s.baseline <= +s.floor) note += "Your starting point is already at or under your end goal, so the target holds steady.";
+    else if (reached) note += "You reach your end goal of " + Math.round(+s.floor) + " in " + mLabel(reached) + ", about " + fmt1(per) + " a week.";
+    else note += "Your end goal of " + Math.round(+s.floor) + " (about " + fmt1(per) + " a week) comes after the months shown.";
+    $("planNote").textContent = note;
+  }
+
+  function renderChart() {
+    const end = view > THIS_M ? THIS_M : view;
+    const months = [];
+    for (let i = 5; i >= 0; i--) months.push(addMonths(end, -i));
+    const data = months.map(mk => ({ mk, u: usedFor(mk), t: targetFor(mk) }));
+    const maxV = Math.max(10, ...data.map(d => Math.max(d.u, d.t || 0)));
+    const step = maxV <= 40 ? 10 : maxV <= 100 ? 20 : maxV <= 200 ? 50 : 100;
+    const yMax = Math.ceil(maxV / step) * step;
+    const W = 420, H = 200, L = 34, R = 8, T = 10, B = 26;
+    const pw = W - L - R, ph = H - T - B;
+    const y = v => T + ph - (v / yMax) * ph;
+    const slot = pw / data.length, bw = Math.min(34, slot * 0.55);
+    let svg = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Standard drinks per month against target, last six months">';
+    for (let v = 0; v <= yMax; v += step) {
+      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--line)" stroke-width="1"/>';
+      svg += '<text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + "</text>";
+    }
+    data.forEach((d, i) => {
+      const cx = L + slot * i + slot / 2;
+      const over = d.t != null && d.u > d.t;
+      if (d.u > 0) svg += '<rect x="' + (cx - bw / 2) + '" y="' + y(d.u) + '" width="' + bw + '" height="' + (y(0) - y(d.u)) + '" rx="3" fill="' + (over ? "var(--bad)" : "var(--accent)") + '"><title>' + mLabel(d.mk) + ": " + fmt1(d.u) + "</title></rect>";
+      if (d.t != null) svg += '<line x1="' + (cx - bw / 2 - 5) + '" x2="' + (cx + bw / 2 + 5) + '" y1="' + y(d.t) + '" y2="' + y(d.t) + '" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"><title>Target ' + d.t + "</title></line>";
+      svg += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle"' + (d.mk === view ? ' style="fill:var(--ink);font-weight:500"' : "") + ">" + SHORT[parseM(d.mk)[1] - 1] + "</text>";
+    });
+    svg += "</svg>";
+    $("chart").innerHTML = svg;
+  }
+
+  // ---------- settings / setup ----------
+  const tpl = $("settingsTpl").content.cloneNode(true);
+  const settingsPanel = tpl.querySelector("#settingsPanel");
+  $("settingsSlot").appendChild(tpl);
+  const setFields = $("setFields"), setDetails = $("setDetails");
+
+  function renderSetupPlacement() {
+    const ready = !!state.settings.ready;
+    const slot = ready ? $("settingsSlot") : $("setupSlot");
+    if (settingsPanel.parentNode !== slot) slot.appendChild(settingsPanel);
+    settingsPanel.classList.toggle("setup", !ready);
+    $("setupIntro").hidden = ready;
+    $("setupActions").hidden = ready;
+    setDetails.hidden = !ready;
+    if (ready) { if (setFields.parentNode !== setDetails) setDetails.appendChild(setFields); }
+    else if (setFields.parentNode !== settingsPanel) settingsPanel.insertBefore(setFields, $("setupActions"));
+  }
+  function renderSetupPreview() {
+    if (state.settings.ready) return;
+    const s = state.settings;
+    const a = targetFor(s.start), b = targetFor(addMonths(s.start, 1)), c = targetFor(addMonths(s.start, 2));
+    $("setupPreview").innerHTML = "First three targets: <span class=\"num\">" + a + " → " + b + " → " + c + "</span> standard drinks";
+  }
+  function syncSettingsInputs() {
+    const s = state.settings;
+    $("sBase").value = s.baseline; $("sCut").value = s.cut; $("sFloor").value = s.floor; $("sStart").value = s.start;
+  }
+  function readSettingsInputs() {
+    const s = state.settings;
+    const b = parseFloat($("sBase").value), c = parseFloat($("sCut").value), f = parseFloat($("sFloor").value), st = $("sStart").value;
+    if (isFinite(b) && b > 0) s.baseline = Math.min(1000, b);
+    if (isFinite(c) && c >= 0) s.cut = Math.min(50, c);
+    if (isFinite(f) && f >= 0) s.floor = Math.min(1000, f);
+    if (/^\d{4}-\d{2}$/.test(st)) s.start = st;
+  }
+  ["sBase", "sCut", "sFloor", "sStart"].forEach(id => $(id).addEventListener("input", () => {
+    readSettingsInputs(); render();
+    if (state.settings.ready) persistSettings(false);
+  }));
+  $("startBtn").addEventListener("click", () => {
+    readSettingsInputs();
+    state.settings.ready = true;
+    persistSettings(true);
+    render();
+    toast("Plan started. Your target for " + mLabel(THIS_M) + " is " + (targetFor(THIS_M) ?? "set") + ".");
+  });
+
+  // ---------- add form ----------
+  function renderChips() {
+    $("chips").innerHTML = PRESETS.map(p => '<button type="button" class="chip" data-p="' + p.k + '" aria-pressed="' + (p.k === preset) + '"><b>' + p.name + "</b><span>" + (p.ml ? p.ml + " ml · " + p.abv + "% · " + fmt1(sdOf(p.ml, p.abv, 1)) + " std" : "Enter size and %") + "</span></button>").join("");
+  }
+  function pickPreset(k) {
+    preset = k;
+    const p = PRESETS.find(x => x.k === k);
+    if (p.ml) { $("ml").value = p.ml; $("abv").value = p.abv; }
+    else { $("ml").value = ""; $("abv").value = ""; $("ml").focus(); }
+    renderChips(); updateCalc();
+  }
+  function formValues() {
+    const ml = parseFloat($("ml").value), abv = parseFloat($("abv").value), n = Math.round(parseFloat($("count").value));
+    const d = $("date").value;
+    const ok = ml > 0 && ml <= 3000 && abv > 0 && abv <= 80 && n >= 1 && n <= 50 && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= TODAY;
+    return { ml, abv, n, d, ok };
+  }
+  function updateCalc() {
+    const v = formValues();
+    if (v.ok) {
+      const sd = sdOf(v.ml, v.abv, v.n);
+      $("calc").innerHTML = "<span class=\"num\">" + v.n + " × " + v.ml + " ml × " + v.abv + "% × 0.789</span> = <b class=\"num\">" + fmt1(sd) + "</b> standard drinks";
+      $("addBtn").disabled = false;
+      $("addBtn").textContent = "Log " + fmt1(sd);
+    } else {
+      $("calc").innerHTML = '<span class="muted">' + ($("date").value > TODAY ? "You can't log a day that hasn't happened yet." : "Enter a size and alcohol % to work out standard drinks.") + "</span>";
+      $("addBtn").disabled = true;
+      $("addBtn").textContent = "Log it";
+    }
+  }
+  $("chips").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (b) pickPreset(b.dataset.p); });
+  ["ml", "abv"].forEach(id => $(id).addEventListener("input", () => {
+    const p = PRESETS.find(x => x.k === preset);
+    if (p.ml && (+$("ml").value !== p.ml || +$("abv").value !== p.abv)) { preset = "custom"; renderChips(); }
+    updateCalc();
+  }));
+  $("count").addEventListener("input", updateCalc);
+  $("date").addEventListener("input", updateCalc);
+  $("cMinus").addEventListener("click", () => { $("count").value = Math.max(1, (parseInt($("count").value, 10) || 1) - 1); updateCalc(); });
+  $("cPlus").addEventListener("click", () => { $("count").value = Math.min(50, (parseInt($("count").value, 10) || 0) + 1); updateCalc(); });
+
+  $("addBtn").addEventListener("click", () => {
+    const v = formValues();
+    if (!v.ok) return;
+    const p = PRESETS.find(x => x.k === preset);
+    const name = preset === "custom" ? "Drink (" + v.ml + " ml, " + v.abv + "%)" : p.name;
+    const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), d: v.d, ts: new Date().toISOString(), name, ml: v.ml, abv: v.abv, n: v.n, sd: sdOf(v.ml, v.abv, v.n) };
+    const mk = v.d.slice(0, 7);
+    state.months[mk] = [...entriesOf(mk), entry];
+    persistMonth(mk);
+    view = mk;
+    $("count").value = 1;
+    render(); updateCalc();
+    const dayTot = dayTotals(mk)[v.d] || 0;
+    toast("Logged " + fmt1(entry.sd) + " standard drinks." + (dayTot > 4 ? " That day is now over 4." : ""), () => removeEntry(mk, entry.id, true));
+  });
+
+  function removeEntry(mk, id, silent) {
+    const list = entriesOf(mk);
+    const gone = list.find(e => e.id === id);
+    if (!gone) return;
+    state.months[mk] = list.filter(e => e.id !== id);
+    persistMonth(mk);
+    render();
+    if (!silent) toast("Deleted " + gone.name + ".", () => {
+      state.months[mk] = [...entriesOf(mk), gone];
+      persistMonth(mk); render();
+    });
+  }
+  $("entries").addEventListener("click", e => { const b = e.target.closest("[data-del]"); if (b) removeEntry(view, b.dataset.del); });
+  $("cal").addEventListener("click", e => {
+    const b = e.target.closest("[data-day]");
+    if (!b || b.disabled) return;
+    $("date").value = b.dataset.day; updateCalc();
+    $("addH").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  });
+
+  // ---------- month nav ----------
+  $("prevM").addEventListener("click", () => { view = addMonths(view, -1); render(); });
+  $("nextM").addEventListener("click", () => { view = addMonths(view, 1); render(); });
+  $("thisM").addEventListener("click", () => { view = THIS_M; render(); });
+
+  // ---------- toast ----------
+  let toastT = null, undoFn = null;
+  function toast(msg, undo) {
+    $("toastMsg").textContent = msg;
+    undoFn = undo || null;
+    $("toastBtn").hidden = !undo;
+    $("toast").hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { $("toast").hidden = true; undoFn = null; }, 6000);
+  }
+  $("toastBtn").addEventListener("click", () => { if (undoFn) { const f = undoFn; undoFn = null; f(); } $("toast").hidden = true; });
+
+  // ---------- boot ----------
+  $("date").value = TODAY; $("date").max = TODAY;
+  const local = loadLocal();
+  if (local) state = { settings: { ...DEFAULTS, ...local.settings }, months: local.months || {} };
+  syncSettingsInputs();
+  renderChips(); pickPreset(preset);
+  render();
+  connect();
+})();
+</script>
+
+</body>
+</html>
