@@ -13,14 +13,7 @@
   =============================================================
 -->
 <script>
-window.JAZNIT_FIREBASE = const firebaseConfig = {
-  apiKey: "AIza...",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  storageBucket: "your-project.firebasestorage.app",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abc123"
-};
+window.JAZNIT_FIREBASE = null;
 /* Example of what it looks like once filled in:
 window.JAZNIT_FIREBASE = {
   apiKey: "AIza...",
@@ -1233,10 +1226,16 @@ footer a { color: var(--accent); }
     fb.signInWithPopup(fb.auth, new fb.GoogleAuthProvider()).catch(err => {
       const code = err && err.code;
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
-      if (code === "auth/popup-blocked") toast("Your browser blocked the sign-in window. Allow pop-ups for this site and try again.");
-      else if (code === "auth/unauthorized-domain") toast("This web address isn't on the Firebase authorised domains list yet (README step 3).");
-      else if (code === "auth/operation-not-allowed") toast("Google sign-in isn't switched on in Firebase yet (README step 3).");
-      else toast("Sign-in didn't work. Check your connection and try again.");
+      const msgs = {
+        "auth/popup-blocked": "Your browser blocked the sign-in window. Allow pop-ups for this site and try again.",
+        "auth/unauthorized-domain": "This web address isn't on the Firebase authorised domains list yet. Add " + location.hostname + " (README step 3).",
+        "auth/operation-not-allowed": "Google sign-in isn't switched on in Firebase yet (README step 3).",
+        "auth/configuration-not-found": "Authentication isn't set up in Firebase yet. Open Authentication, click Get started, then switch on Google (README step 3).",
+        "auth/invalid-api-key": "The apiKey in the config doesn't match your Firebase project. Copy the config again (README step 2).",
+        "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "The apiKey in the config doesn't match your Firebase project. Copy the config again (README step 2).",
+        "auth/network-request-failed": "Couldn't reach Google. Check your internet connection and try again."
+      };
+      toast((msgs[code] || "Sign-in didn't work.") + " (Error: " + (code || (err && err.message) || "unknown") + ")");
       console.error("Jaznit: sign-in error", err);
     });
   });
