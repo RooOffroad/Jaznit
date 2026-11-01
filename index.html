@@ -4,11 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jaznit</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+
+<!--
+  ===================== FIREBASE SETTINGS =====================
+  To turn on sign-in and friends, paste your Firebase web config
+  between the curly brackets below (see README.md, step 4).
+  Leave it as null and Jaznit runs for one person on one device.
+  =============================================================
+-->
+<script>
+window.JAZNIT_FIREBASE = null;
+/* Example of what it looks like once filled in:
+window.JAZNIT_FIREBASE = {
+  apiKey: "AIza...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.firebasestorage.app",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abc123"
+};
+*/
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a monthly "allowance" of standard drinks shown as dots that fill like glasses; main column for this month + logging, side column for the calendar and the step-down plan. */
+/* Layout: a monthly "allowance" of standard drinks shown as dots that fill like glasses; people bar on top, main column for this month + logging, side column for friends, calendar and plan. */
 :root {
   --bg: #edf0f5;
   --surface: #ffffff;
@@ -27,31 +48,28 @@
   --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     --bg: #0e131b; --surface: #161d28; --ink: #e6ebf2; --muted: #98a3b4; --line: #283242;
     --accent: #8098ff; --accent-soft: #222d55; --on-accent: #0e131b;
     --good: #52c28f; --warn: #e3a64c; --bad: #ff7b6f; --dot-empty: #323d4e;
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
-  --bg: #0e131b; --surface: #161d28; --ink: #e6ebf2; --muted: #98a3b4; --line: #283242;
-  --accent: #8098ff; --accent-soft: #222d55; --on-accent: #0e131b;
-  --good: #52c28f; --warn: #e3a64c; --bad: #ff7b6f; --dot-empty: #323d4e;
-  color-scheme: dark;
-}
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
 body {
+  margin: 0;
   background: var(--bg); color: var(--ink);
   font-family: var(--f-body); font-size: 15px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: calc(20px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px));
-  margin: 0;
 }
+[hidden] { display: none !important; }
 .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
 h2 { font-size: 1.15rem; font-weight: 700; }
+p { margin: 0; }
 .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
 .num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
@@ -60,26 +78,39 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 
 /* header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .brand h1 { font-size: 1.9rem; font-weight: 700; }
 .status { font-size: 0.8rem; color: var(--muted); }
+.topright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acct { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.acct button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; }
 .monthnav { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
 .monthnav button { border: 0; background: transparent; width: 34px; height: 34px; border-radius: 50%; font-size: 1.1rem; }
 .monthnav button:hover { background: var(--accent-soft); }
 .monthnav .m { min-width: 9.5em; text-align: center; font-weight: 600; }
 .monthnav .today-btn { width: auto; padding: 0 12px; border-radius: 999px; font-size: 0.8rem; color: var(--accent); font-weight: 600; }
 
+/* people bar */
+.people { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.who { flex: none; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-weight: 600; font-size: 0.9rem; }
+.who:hover { border-color: var(--accent); }
+.who[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sdot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.sdot.good { background: var(--good); } .sdot.warn { background: var(--warn); } .sdot.bad { background: var(--bad); }
+
 .grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel.feature { border: 2px solid var(--accent); }
 
 /* summary */
 .headline { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .big { font-family: var(--f-display); font-size: clamp(2.6rem, 7vw, 3.6rem); font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
 .big small { font-family: var(--f-body); font-size: 1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
-.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; border: 1px solid currentColor; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
 .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.small { font-size: 0.72rem; padding: 2px 9px; }
 .pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.neutral { color: var(--muted); }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 520px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -93,10 +124,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .note { font-size: 0.85rem; color: var(--muted); }
 .week { font-size: 0.9rem; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); }
 .week.bad { background: color-mix(in srgb, var(--bad) 14%, var(--surface)); }
+.viewnote { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--accent-soft); border-color: transparent; }
 
-/* add form */
+/* forms */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 11px; text-align: left; display: flex; flex-direction: column; gap: 0; line-height: 1.25; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 11px; text-align: left; display: flex; flex-direction: column; line-height: 1.25; }
 .chip b { font-weight: 600; font-size: 0.88rem; }
 .chip span { font-size: 0.75rem; color: var(--muted); font-family: var(--f-data); }
 .chip:hover { border-color: var(--accent); }
@@ -104,7 +136,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 560px) { .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.field input { font: inherit; font-family: var(--f-data); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+.field input { font: inherit; font-family: var(--f-data); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; font-size: 16px; }
+.field input.text { font-family: var(--f-body); }
 .field .hint { font-size: 0.76rem; color: var(--muted); }
 .stepper { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); }
 .stepper button { border: 0; background: transparent; width: 34px; font-size: 1.05rem; }
@@ -116,6 +149,13 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .primary { border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; padding: 11px 18px; border-radius: 10px; }
 .primary:hover { filter: brightness(1.08); }
 .primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.secondary { border: 1px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; padding: 9px 14px; border-radius: 10px; white-space: nowrap; }
+.secondary:hover { background: var(--accent-soft); }
+.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.ghost { border: 0; background: transparent; color: var(--muted); font-weight: 500; padding: 9px 4px; text-decoration: underline; text-underline-offset: 3px; }
+.ghost.armed { color: var(--bad); font-weight: 600; }
+.inline { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.inline .field { flex: 1 1 160px; }
 
 /* entries */
 .day { display: flex; flex-direction: column; gap: 4px; }
@@ -130,6 +170,23 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .del:hover { color: var(--bad); border-color: var(--line); }
 .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 0.9rem; text-align: center; }
 
+/* friends */
+.ghead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.ghead b { font-family: var(--f-display); font-size: 1.1rem; overflow-wrap: anywhere; }
+.codebox { display: flex; flex-direction: column; align-items: flex-end; }
+.code { font-size: 1.15rem; letter-spacing: 0.08em; user-select: all; }
+.row-btns { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.board { display: flex; flex-direction: column; gap: 8px; }
+.brow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px; }
+.brow:hover { border-color: var(--accent); }
+.brow[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.brow .bname { font-weight: 600; overflow-wrap: anywhere; }
+.brow .bbar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--dot-empty); overflow: hidden; }
+.brow .bbar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.brow .bbar i.over { background: var(--bad); }
+.brow .bstats { grid-column: 1 / -1; font-size: 0.78rem; color: var(--muted); }
+.linkbox { font-family: var(--f-data); font-size: 0.8rem; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+
 /* calendar */
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal .dow { font-size: 0.7rem; text-align: center; color: var(--muted); font-weight: 600; letter-spacing: 0.05em; }
@@ -143,7 +200,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .cell.today { box-shadow: inset 0 0 0 2px var(--ink); }
 .cell.future { opacity: 0.45; cursor: default; }
 .cell.blank { background: transparent; }
-button.cell:not(.future):hover { border-color: var(--accent); }
+.cal.readonly .cell { cursor: default; }
+.cal:not(.readonly) button.cell:not(.future):hover { border-color: var(--accent); }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.78rem; color: var(--muted); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 
@@ -165,8 +223,6 @@ details.settings summary::after { content: "+"; font-family: var(--f-data); colo
 details.settings[open] summary::after { content: "–"; }
 .setfields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 @media (max-width: 420px) { .setfields { grid-template-columns: minmax(0, 1fr); } }
-.setup { border: 2px solid var(--accent); }
-.setup p { margin: 0; max-width: 62ch; }
 
 footer { font-size: 0.8rem; color: var(--muted); max-width: 75ch; }
 footer a { color: var(--accent); }
@@ -177,26 +233,43 @@ footer a { color: var(--accent); }
 </style>
 </head>
 <body>
-
-
 <div class="wrap">
   <header class="top">
     <div class="brand">
       <h1>Jaznit</h1>
-      <span class="status" id="status">Connecting…</span>
+      <span class="status" id="status">Loading…</span>
     </div>
-    <nav class="monthnav" aria-label="Choose month">
-      <button type="button" id="prevM" aria-label="Previous month">‹</button>
-      <span class="m" id="mLabel"></span>
-      <button type="button" id="nextM" aria-label="Next month">›</button>
-      <button type="button" class="today-btn" id="thisM">This month</button>
-    </nav>
+    <div class="topright">
+      <div class="acct" id="acct" hidden><span id="acctName"></span><button type="button" id="signOutBtn">Sign out</button></div>
+      <nav class="monthnav" aria-label="Choose month">
+        <button type="button" id="prevM" aria-label="Previous month">‹</button>
+        <span class="m" id="mLabel"></span>
+        <button type="button" id="nextM" aria-label="Next month">›</button>
+        <button type="button" class="today-btn" id="thisM">This month</button>
+      </nav>
+    </div>
   </header>
+
+  <nav class="people" id="people" aria-label="Whose log to show" hidden></nav>
+
+  <section class="panel feature" id="signinCard" hidden>
+    <h2>Sign in to track with friends</h2>
+    <p class="muted">Signing in with Google saves your log to your account, so it follows you across devices. Then you can start a group or join a friend's.</p>
+    <div class="row-btns">
+      <button type="button" class="primary" data-signin>Sign in with Google</button>
+      <button type="button" class="ghost" id="dismissSignin">Use on this device only</button>
+    </div>
+  </section>
 
   <div id="setupSlot"></div>
 
   <div class="grid">
     <div class="col">
+      <section class="panel viewnote" id="viewNote" hidden>
+        <span id="viewNoteText"></span>
+        <button type="button" class="secondary" id="backToMe">Back to my log</button>
+      </section>
+
       <section class="panel" aria-labelledby="sumH">
         <div class="headline">
           <div>
@@ -207,11 +280,11 @@ footer a { color: var(--accent); }
         </div>
         <div class="stats" id="stats"></div>
         <div class="dots" id="dots" aria-hidden="true"></div>
-        <div class="note" id="dotNote">Each dot is one standard drink (10 g of alcohol). They fill as you log, and turn red past your target.</div>
+        <div class="note" id="dotNote">Each dot is one standard drink (10 g of alcohol). They fill as drinks are logged, and turn red past the target.</div>
         <div class="week" id="week" hidden></div>
       </section>
 
-      <section class="panel" aria-labelledby="addH">
+      <section class="panel" aria-labelledby="addH" id="addPanel">
         <h2 id="addH">Log a drink</h2>
         <div class="chips" id="chips" role="group" aria-label="Drink type"></div>
         <div class="fields">
@@ -236,19 +309,56 @@ footer a { color: var(--accent); }
     </div>
 
     <div class="col">
+      <section class="panel" aria-labelledby="friendsH" id="friends">
+        <h2 id="friendsH">Friends</h2>
+        <div id="fpNoCfg" hidden>
+          <p class="note">This copy only tracks one person on this device. To add friends, connect it to Firebase by following the setup guide (README.md) in the GitHub repo.</p>
+        </div>
+        <div id="fpSignin" hidden>
+          <p class="note">Sign in to start a group or join a friend's.</p>
+          <div class="row-btns"><button type="button" class="secondary" data-signin>Sign in with Google</button></div>
+        </div>
+        <div id="fpLoading" class="note" hidden>Loading your group…</div>
+        <div id="fpNoGroup" hidden style="display:flex;flex-direction:column;gap:14px">
+          <p class="note">Start a group and share the invite code, or join a friend's group. Everyone in a group can see each other's full drink logs.</p>
+          <div class="inline">
+            <label class="field" for="gName"><span class="label">Group name</span><input class="text" id="gName" maxlength="40" placeholder="Friday crew"></label>
+            <button type="button" class="secondary" id="gCreate">Create group</button>
+          </div>
+          <div class="inline">
+            <label class="field" for="gCode"><span class="label">Invite code</span><input id="gCode" maxlength="12" placeholder="ABCD-2345" autocapitalize="characters" autocomplete="off"></label>
+            <button type="button" class="secondary" id="gJoin">Join group</button>
+          </div>
+        </div>
+        <div id="fpGroup" hidden style="display:flex;flex-direction:column;gap:14px">
+          <div class="ghead">
+            <div><div class="label">Group</div><b id="gTitle"></b></div>
+            <div class="codebox"><span class="label">Invite code</span><span class="num code" id="gCodeShow"></span></div>
+          </div>
+          <div class="row-btns">
+            <button type="button" class="secondary" id="gCopy">Copy invite link</button>
+            <button type="button" class="ghost" id="gLeave">Leave group</button>
+          </div>
+          <input class="linkbox" id="gLinkBox" readonly hidden aria-label="Invite link">
+          <div class="label" id="boardLabel"></div>
+          <div class="board" id="board"></div>
+          <p class="note">Tap someone to see their full log. Everyone in the group can see each other's drinks.</p>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="calH">
         <h2 id="calH">By day</h2>
         <div class="cal" id="cal"></div>
         <div class="legend">
           <span><i style="background: color-mix(in srgb, var(--accent) 60%, var(--surface))"></i>Darker = more drinks</span>
           <span><i style="border: 2px solid var(--bad)"></i>Over 4 in a day</span>
-          <span style="color: var(--good); font-weight: 600">free</span><span>Alcohol-free day</span>
+          <span><b style="color: var(--good)">free</b> Alcohol-free day</span>
         </div>
-        <div class="note">Tap a day to log a drink against it.</div>
+        <div class="note" id="calNote">Tap a day to log a drink against it.</div>
       </section>
 
       <section class="panel" aria-labelledby="planH">
-        <h2 id="planH">Your step-down plan</h2>
+        <h2 id="planH">Step-down plan</h2>
         <div class="ladder" id="ladder"></div>
         <div class="note" id="planNote"></div>
       </section>
@@ -271,17 +381,17 @@ footer a { color: var(--accent); }
   </footer>
 </div>
 
-<!-- settings form; moved between the setup slot and the sidebar -->
 <template id="settingsTpl">
   <section class="panel" id="settingsPanel">
-    <div id="setupIntro">
+    <div id="setupIntro" style="display:flex;flex-direction:column;gap:6px">
       <h2>Set up your plan</h2>
-      <p class="muted" style="margin-top: 6px">Tell Jaznit roughly where you are now. Your monthly target starts there and steps down each month until it reaches your end goal.</p>
+      <p class="muted">Tell Jaznit roughly where you are now. Your monthly target starts there and steps down each month until it reaches your end goal.</p>
     </div>
     <details class="settings" id="setDetails">
-      <summary>Plan settings</summary>
+      <summary>My plan settings</summary>
     </details>
     <div class="setfields" id="setFields">
+      <label class="field" for="sName" id="sNameWrap" hidden><span class="label">Your name, as friends see it</span><input class="text" id="sName" maxlength="40"></label>
       <label class="field" for="sBase"><span class="label">Drinks in a typical month now</span><input id="sBase" type="number" min="1" max="1000" step="1"><span class="hint">Not sure? Count a typical week and multiply by 4.3.</span></label>
       <label class="field" for="sCut"><span class="label">Cut each month (%)</span><input id="sCut" type="number" min="1" max="50" step="1"><span class="hint">10% is a steady pace. Bigger cuts are harder to keep up.</span></label>
       <label class="field" for="sFloor"><span class="label">End goal per month</span><input id="sFloor" type="number" min="0" max="1000" step="1"><span class="hint">43 a month is about 10 a week, the guideline limit.</span></label>
@@ -299,17 +409,22 @@ footer a { color: var(--accent); }
 <script>
 (function () {
   "use strict";
+  const CFG = window.JAZNIT_FIREBASE || null;
+  const SDK = "https://www.gstatic.com/firebasejs/13.1.0/";
   const SD_FACTOR = 0.789;
   const LS_KEY = "jaznit.v1";
+  const LS_DISMISS = "jaznit.signinDismissed";
+  const MAX_GROUP = 20;
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
   const pad = n => String(n).padStart(2, "0");
   const monthKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1);
   const dayKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   const parseM = mk => mk.split("-").map(Number);
-  const addMonths = (mk, n) => { const [y, m] = parseM(mk); const d = new Date(y, m - 1 + n, 1); return monthKey(d); };
+  const addMonths = (mk, n) => { const [y, m] = parseM(mk); return monthKey(new Date(y, m - 1 + n, 1)); };
   const monthsBetween = (a, b) => { const [ya, ma] = parseM(a); const [yb, mb] = parseM(b); return (yb - ya) * 12 + (mb - ma); };
   const daysIn = mk => { const [y, m] = parseM(mk); return new Date(y, m, 0).getDate(); };
   const fmt1 = n => (Math.round(n * 10) / 10).toFixed(1);
-  const fmtN = n => Number.isInteger(n) ? String(n) : fmt1(n);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -317,6 +432,13 @@ footer a { color: var(--accent); }
   const mLabel = mk => { const [y, m] = parseM(mk); return MONTHS[m - 1] + " " + y; };
   const mShort = mk => { const [y, m] = parseM(mk); return SHORT[m - 1] + " " + String(y).slice(2); };
   const sdOf = (ml, abv, n) => Math.round(n * (ml / 1000) * abv * SD_FACTOR * 100) / 100;
+  const isoNow = () => new Date().toISOString();
+  const fmtCode = c => c.slice(0, 4) + "-" + c.slice(4);
+  const cleanCode = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function genCode() {
+    const a = new Uint32Array(8); crypto.getRandomValues(a);
+    return Array.from(a, x => CODE_CHARS[x % CODE_CHARS.length]).join("");
+  }
 
   // Typical Australian serves. ABV is a common value; labels vary.
   const PRESETS = [
@@ -337,144 +459,82 @@ footer a { color: var(--accent); }
   const THIS_M = monthKey(now);
   const DEFAULTS = { ready: false, baseline: 60, cut: 10, floor: 43, start: THIS_M };
 
-  let state = { settings: { ...DEFAULTS }, months: {} };
+  // ---------- state ----------
+  // people: uid -> { uid, name, settings, months, groupId, loaded }
+  const people = {};
+  let meId = "local", viewId = "local";
+  // modes: local (no Firebase), connecting, signed-out, fb-error, online-loading, online, online-error
+  let mode = CFG ? "connecting" : "local";
+  let fb = null, fbUser = null;
+  let groupId = null, group = null;
   let view = THIS_M;
-  let mode = "connecting"; // connecting | db-loading | db | db-slow | db-error | local
-  let col = null;
   let preset = "can";
+  let pendingJoin = null;
 
   const $ = id => document.getElementById(id);
+  const me = () => people[meId];
+  const P = () => people[viewId] || people[meId];
+  const viewingMe = () => viewId === meId;
+  const online = () => mode === "online" && fb && meId !== "local";
+  const nameOf = p => (p.uid === meId ? "You" : (p.name || "Friend"));
+
+  function blankPerson(uid, name) {
+    return { uid, name, settings: { ...DEFAULTS }, months: {}, groupId: null, loaded: false };
+  }
 
   // ---------- local storage ----------
   function loadLocal() {
     try { const raw = localStorage.getItem(LS_KEY); if (raw) { const s = JSON.parse(raw); if (s && s.settings) return s; } } catch (e) {}
     return null;
   }
-  function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
-
-  // ---------- db ----------
-  const queues = {};
-  function enqueue(docId, fn) {
-    queues[docId] = (queues[docId] || Promise.resolve()).then(fn).catch(err => {
-      const code = err && err.code;
-      if (code === "invalid_argument") toast("Couldn't save. You may only have view access to this page.");
-      else if (code === "quota_exceeded") toast("Storage is full. Delete some old drinks to keep logging.");
-      else toast("Couldn't save that change. Check your connection and try again.");
-    });
+  function saveLocal() {
+    const p = people.local; if (!p) return;
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ settings: p.settings, months: p.months })); } catch (e) {}
   }
-  const usingDb = () => col && mode !== "local";
-  function persistMonth(mk) {
-    if (usingDb()) {
-      enqueue("m-" + mk, () => {
-        const list = state.months[mk] || [];
-        const ref = col.doc("m-" + mk);
-        return list.length ? ref.set({ entries: list.map(e => ({ ...e })) }) : ref.delete();
-      });
-    } else saveLocal();
-  }
-  let setTimer = null;
-  function persistSettings(immediate) {
-    clearTimeout(setTimer);
-    const go = () => {
-      if (usingDb()) enqueue("settings", () => col.doc("settings").set({ ...state.settings }));
-      else saveLocal();
-    };
-    if (immediate) go(); else setTimer = setTimeout(go, 600);
-  }
-
-  async function connect() {
-    const c = window.claude;
-    if (!c || typeof c.use !== "function") return toLocal();
-    try {
-      const [db, user] = await Promise.all([c.use("db"), c.use("user")]);
-      const uid = user ? await user.id() : null;
-      if (!db || !uid) return toLocal();
-      col = db.collection("data/users/" + uid);
-      mode = "db-loading"; renderStatus();
-      const timer = setTimeout(() => { if (mode === "db-loading") { mode = "db-slow"; renderStatus(); } }, 10000);
-      col.onSnapshot(snap => {
-        const next = { settings: { ...DEFAULTS }, months: {} };
-        snap.docs.forEach(d => {
-          const data = d.data() || {};
-          if (d.id === "settings") next.settings = { ...DEFAULTS, ...data };
-          else if (d.id.startsWith("m-") && Array.isArray(data.entries)) next.months[d.id.slice(2)] = data.entries.map(e => ({ ...e }));
-        });
-        state = next;
-        if (!snap.metadata.fromCache) { clearTimeout(timer); mode = "db"; }
-        syncSettingsInputs();
-        render();
-      }, () => { clearTimeout(timer); mode = "db-error"; renderStatus(); });
-    } catch (e) { toLocal(); }
-  }
-  function toLocal() {
-    mode = "local";
+  function useLocal() {
+    unsubAll();
+    groupId = null; group = null;
+    Object.keys(people).forEach(k => delete people[k]);
+    const p = blankPerson("local", "You");
     const s = loadLocal();
-    if (s) { state = { settings: { ...DEFAULTS, ...s.settings }, months: s.months || {} }; syncSettingsInputs(); }
-    render();
+    if (s) { p.settings = { ...DEFAULTS, ...s.settings }; p.months = s.months || {}; }
+    p.loaded = true;
+    people.local = p;
+    meId = viewId = "local";
+    syncSettingsInputs(true);
   }
 
   // ---------- model ----------
-  function targetFor(mk) {
-    const s = state.settings;
+  function targetFor(mk, p) {
+    p = p || P();
+    const s = p.settings;
     const steps = monthsBetween(s.start, mk);
     if (steps < 0) return null;
     const b = Math.max(0, +s.baseline || 0), f = Math.max(0, +s.floor || 0), cut = Math.min(90, Math.max(0, +s.cut || 0));
     if (b <= f) return Math.round(b);
     return Math.max(Math.round(f), Math.round(b * Math.pow(1 - cut / 100, steps)));
   }
-  const entriesOf = mk => state.months[mk] || [];
-  const usedFor = mk => entriesOf(mk).reduce((a, e) => a + (+e.sd || 0), 0);
-  function dayTotals(mk) {
+  const entriesOf = (mk, p) => ((p || P()).months[mk] || []);
+  const usedFor = (mk, p) => entriesOf(mk, p).reduce((a, e) => a + (+e.sd || 0), 0);
+  function dayTotals(mk, p) {
     const t = {};
-    entriesOf(mk).forEach(e => { t[e.d] = (t[e.d] || 0) + (+e.sd || 0); });
+    entriesOf(mk, p).forEach(e => { t[e.d] = (t[e.d] || 0) + (+e.sd || 0); });
     return t;
   }
-  function last7() {
+  function last7(p) {
     let total = 0;
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
     const from = dayKey(start);
     [monthKey(start), THIS_M].filter((v, i, a) => a.indexOf(v) === i).forEach(mk => {
-      entriesOf(mk).forEach(e => { if (e.d >= from && e.d <= TODAY) total += +e.sd || 0; });
+      entriesOf(mk, p).forEach(e => { if (e.d >= from && e.d <= TODAY) total += +e.sd || 0; });
     });
     return total;
   }
-
-  // ---------- render ----------
-  function renderStatus() {
-    const msg = {
-      "connecting": "Connecting…",
-      "db-loading": "Loading your log…",
-      "db": "Saved to your account, private to you",
-      "db-slow": "Can't reach your saved log yet. What you see may be out of date.",
-      "db-error": "Lost connection to your saved log. Reload the page to reconnect.",
-      "local": "Saved in this browser only"
-    }[mode];
-    $("status").textContent = msg;
-  }
-
-  function render() {
-    renderStatus();
-    $("mLabel").textContent = mLabel(view);
-    $("thisM").hidden = view === THIS_M;
-    renderSetupPlacement();
-    renderSummary();
-    renderCalendar();
-    renderEntries();
-    renderLadder();
-    renderChart();
-    renderSetupPreview();
-  }
-
-  function renderSummary() {
-    const t = targetFor(view);
-    const u = usedFor(view);
-    const dim = daysIn(view);
-    const isCur = view === THIS_M, isPast = view < THIS_M;
-    const big = $("big"), pill = $("pill");
-    big.innerHTML = '<span class="num">' + fmt1(u) + "</span>" + (t != null ? "<small>of " + t + " target</small>" : "<small>no target this month</small>");
-
+  function monthStatus(p, mk) {
+    const t = targetFor(mk, p), u = usedFor(mk, p), dim = daysIn(mk);
+    const isCur = mk === THIS_M, isPast = mk < THIS_M;
     let cls = "neutral", txt = "Upcoming";
-    if (t == null) { cls = "neutral"; txt = "Before your plan"; }
+    if (t == null) txt = "Before plan";
     else if (isCur) {
       const expected = t * now.getDate() / dim;
       if (u > t) { cls = "bad"; txt = "Over target"; }
@@ -483,41 +543,365 @@ footer a { color: var(--accent); }
     } else if (isPast) {
       if (u > t) { cls = "bad"; txt = "Over target"; } else { cls = "good"; txt = "Under target"; }
     }
-    pill.className = "pill " + cls; pill.textContent = txt;
-
-    const totals = dayTotals(view);
+    const totals = dayTotals(mk, p);
     const lastDay = isCur ? now.getDate() : (isPast ? dim : 0);
     let free = 0, heavy = 0;
     for (let d = 1; d <= lastDay; d++) {
-      const v = totals[view + "-" + pad(d)] || 0;
+      const v = totals[mk + "-" + pad(d)] || 0;
       if (v === 0) free++;
       if (v > 4) heavy++;
     }
+    return { t, u, dim, isCur, isPast, cls, txt, free, heavy, lastDay };
+  }
+
+  // ---------- Firebase ----------
+  const unsubs = {};
+  function sub(key, start) { if (!unsubs[key]) unsubs[key] = start(); }
+  function unsub(key) { if (unsubs[key]) { try { unsubs[key](); } catch (e) {} delete unsubs[key]; } }
+  function unsubAll() { Object.keys(unsubs).forEach(unsub); }
+
+  async function initFirebase() {
+    try {
+      const [appM, authM, fsM] = await Promise.all([
+        import(SDK + "firebase-app.js"),
+        import(SDK + "firebase-auth.js"),
+        import(SDK + "firebase-firestore.js")
+      ]);
+      const app = appM.initializeApp(CFG);
+      fb = {
+        auth: authM.getAuth(app), db: fsM.getFirestore(app),
+        GoogleAuthProvider: authM.GoogleAuthProvider, signInWithPopup: authM.signInWithPopup, signOut: authM.signOut,
+        doc: fsM.doc, collection: fsM.collection, setDoc: fsM.setDoc, updateDoc: fsM.updateDoc, deleteDoc: fsM.deleteDoc,
+        getDoc: fsM.getDoc, onSnapshot: fsM.onSnapshot, writeBatch: fsM.writeBatch, arrayUnion: fsM.arrayUnion, arrayRemove: fsM.arrayRemove
+      };
+      authM.onAuthStateChanged(fb.auth, u => { if (u) startOnline(u); else stopOnline(); });
+    } catch (e) {
+      console.error("Jaznit: Firebase failed to load", e);
+      mode = "fb-error"; useLocal(); render();
+    }
+  }
+
+  function startOnline(u) {
+    fbUser = u;
+    const localData = loadLocal();
+    unsubAll();
+    groupId = null; group = null;
+    Object.keys(people).forEach(k => delete people[k]);
+    meId = viewId = u.uid;
+    people[meId] = blankPerson(meId, u.displayName || "Me");
+    mode = "online-loading";
+    render();
+    subscribePerson(meId, localData);
+  }
+  function stopOnline() {
+    fbUser = null;
+    useLocal();
+    mode = "signed-out";
+    render();
+  }
+
+  function subscribePerson(uid, localData) {
+    const isMe = uid === meId;
+    sub("u:" + uid, () => fb.onSnapshot(fb.doc(fb.db, "users", uid), snap => {
+      const p = people[uid];
+      if (!p) return;
+      if (!snap.exists()) {
+        if (isMe) createMe(localData); else removePerson(uid);
+        render();
+        return;
+      }
+      const d = snap.data();
+      p.name = d.name || "Friend";
+      p.settings = { ...DEFAULTS, ...(d.settings || {}) };
+      p.groupId = d.groupId || null;
+      p.loaded = true;
+      if (isMe) {
+        mode = "online";
+        syncSettingsInputs(false);
+        if (!snap.metadata.hasPendingWrites) setGroup(p.groupId);
+      }
+      render();
+    }, err => listenError(uid, err)));
+    sub("m:" + uid, () => fb.onSnapshot(fb.collection(fb.db, "users", uid, "months"), snap => {
+      const p = people[uid];
+      if (!p) return;
+      const months = {};
+      snap.forEach(d => { const data = d.data(); if (Array.isArray(data.entries)) months[d.id] = data.entries.map(e => ({ ...e })); });
+      p.months = months;
+      render();
+    }, err => listenError(uid, err)));
+  }
+  function listenError(uid, err) {
+    console.warn("Jaznit: listener error", uid, err && err.code);
+    if (uid === meId) { mode = "online-error"; render(); }
+    else { removePerson(uid); render(); }
+  }
+  function removePerson(uid) {
+    if (uid === meId) return;
+    unsub("u:" + uid); unsub("m:" + uid);
+    delete people[uid];
+    if (viewId === uid) viewId = meId;
+  }
+
+  let creating = false;
+  async function createMe(localData) {
+    if (creating || !fbUser) return;
+    creating = true;
+    const hasLocal = localData && (localData.settings && localData.settings.ready || Object.keys(localData.months || {}).length);
+    try {
+      await fb.setDoc(fb.doc(fb.db, "users", fbUser.uid), {
+        name: (fbUser.displayName || "Me").slice(0, 40),
+        settings: hasLocal ? { ...DEFAULTS, ...localData.settings } : { ...DEFAULTS },
+        groupId: null,
+        updatedAt: isoNow()
+      });
+      if (hasLocal) {
+        for (const mk of Object.keys(localData.months || {})) {
+          const list = localData.months[mk];
+          if (Array.isArray(list) && list.length) await fb.setDoc(fb.doc(fb.db, "users", fbUser.uid, "months", mk), { entries: list });
+        }
+        try { localStorage.removeItem(LS_KEY); } catch (e) {}
+        toast("Moved the drinks saved on this device into your account.");
+      }
+    } catch (e) {
+      console.error("Jaznit: could not create profile", e);
+      mode = "online-error";
+      toast("Couldn't create your profile. Check the Firestore rules are published (README step 5).");
+      render();
+    }
+    creating = false;
+  }
+
+  function setGroup(gid) {
+    if (gid === groupId) return;
+    unsub("g");
+    Object.keys(people).forEach(uid => { if (uid !== meId) removePerson(uid); });
+    groupId = gid; group = null;
+    viewId = meId;
+    if (gid) {
+      sub("g", () => fb.onSnapshot(fb.doc(fb.db, "groups", gid), snap => {
+        if (!snap.exists()) { group = null; render(); return; }
+        const d = snap.data();
+        group = { id: gid, name: d.name || "My group", members: Array.isArray(d.members) ? d.members : [], createdBy: d.createdBy };
+        syncMembers();
+        render();
+      }, err => { console.warn("Jaznit: group listener", err && err.code); group = null; render(); }));
+    }
+    render();
+  }
+  function syncMembers() {
+    const want = new Set(group ? group.members.filter(m => m !== meId) : []);
+    Object.keys(people).forEach(uid => { if (uid !== meId && !want.has(uid)) removePerson(uid); });
+    want.forEach(uid => { if (!people[uid]) { people[uid] = blankPerson(uid, "Friend"); subscribePerson(uid); } });
+  }
+
+  // ---------- writes ----------
+  const queues = {};
+  function enqueue(key, fn) {
+    queues[key] = (queues[key] || Promise.resolve()).then(fn).catch(err => {
+      console.error("Jaznit: write failed", err);
+      const code = err && err.code;
+      if (code === "permission-denied") toast("Couldn't save. Try signing out and back in.");
+      else toast("Couldn't save that change. Check your connection and try again.");
+    });
+  }
+  function persistMonth(mk) {
+    if (online()) {
+      enqueue("m:" + mk, () => {
+        const list = (me().months[mk] || []);
+        const ref = fb.doc(fb.db, "users", meId, "months", mk);
+        return list.length ? fb.setDoc(ref, { entries: list.map(e => ({ ...e })) }) : fb.deleteDoc(ref);
+      });
+    } else saveLocal();
+  }
+  let pendingFields = {}, fieldTimer = null;
+  function persistMe(fields, immediate) {
+    if (!online()) { saveLocal(); return; }
+    Object.assign(pendingFields, fields);
+    clearTimeout(fieldTimer);
+    const go = () => {
+      const f = pendingFields; pendingFields = {};
+      enqueue("u", () => fb.updateDoc(fb.doc(fb.db, "users", meId), { ...f, updatedAt: isoNow() }));
+    };
+    if (immediate) go(); else fieldTimer = setTimeout(go, 700);
+  }
+
+  // ---------- group actions ----------
+  async function createGroup() {
+    if (!online()) return;
+    const name = $("gName").value.trim().slice(0, 40) || "My group";
+    const code = genCode();
+    $("gCreate").disabled = true;
+    try {
+      const b = fb.writeBatch(fb.db);
+      b.set(fb.doc(fb.db, "groups", code), { name, members: [meId], createdBy: meId, createdAt: isoNow() });
+      b.update(fb.doc(fb.db, "users", meId), { groupId: code, updatedAt: isoNow() });
+      await b.commit();
+      $("gName").value = "";
+      toast("Group created. Share the invite code " + fmtCode(code) + " with your friends.");
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't create the group. Check the Firestore rules are published (README step 5).");
+    }
+    $("gCreate").disabled = false;
+  }
+  async function joinGroup() {
+    if (!online()) return;
+    const code = cleanCode($("gCode").value);
+    if (code.length !== 8) { toast("Invite codes are 8 letters and numbers, like ABCD-2345."); return; }
+    $("gJoin").disabled = true;
+    try {
+      const snap = await fb.getDoc(fb.doc(fb.db, "groups", code));
+      if (!snap.exists()) { toast("No group found with code " + fmtCode(code) + ". Check it and try again."); }
+      else {
+        const members = snap.data().members || [];
+        if (members.includes(meId)) { toast("You're already in that group."); }
+        else if (members.length >= MAX_GROUP) { toast("That group is full (" + MAX_GROUP + " people)."); }
+        else {
+          const b = fb.writeBatch(fb.db);
+          if (groupId && groupId !== code) b.update(fb.doc(fb.db, "groups", groupId), { members: fb.arrayRemove(meId) });
+          b.update(fb.doc(fb.db, "groups", code), { members: fb.arrayUnion(meId) });
+          b.update(fb.doc(fb.db, "users", meId), { groupId: code, updatedAt: isoNow() });
+          await b.commit();
+          $("gCode").value = "";
+          pendingJoin = null;
+          if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+          toast("You joined " + (snap.data().name || "the group") + ".");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't join that group. Check the code and your connection.");
+    }
+    $("gJoin").disabled = false;
+  }
+  let leaveArmed = null;
+  async function leaveGroup() {
+    if (!online() || !groupId) return;
+    const btn = $("gLeave");
+    if (!leaveArmed) {
+      btn.textContent = "Tap again to leave"; btn.classList.add("armed");
+      leaveArmed = setTimeout(() => { leaveArmed = null; btn.textContent = "Leave group"; btn.classList.remove("armed"); }, 4000);
+      return;
+    }
+    clearTimeout(leaveArmed); leaveArmed = null;
+    btn.textContent = "Leave group"; btn.classList.remove("armed");
+    try {
+      const b = fb.writeBatch(fb.db);
+      b.update(fb.doc(fb.db, "groups", groupId), { members: fb.arrayRemove(meId) });
+      b.update(fb.doc(fb.db, "users", meId), { groupId: null, updatedAt: isoNow() });
+      await b.commit();
+      toast("You left the group. Your own log is still saved.");
+    } catch (e) {
+      console.error(e);
+      toast("Couldn't leave the group. Try again.");
+    }
+  }
+  function copyInvite() {
+    if (!groupId) return;
+    const link = location.origin + location.pathname + "#join-" + groupId;
+    const box = $("gLinkBox");
+    const fallback = () => { box.value = link; box.hidden = false; box.focus(); box.select(); toast("Copy the link from the box below the buttons."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => { box.hidden = true; toast("Invite link copied. Send it to your friends."); }, fallback);
+    } else fallback();
+  }
+
+  // ---------- render ----------
+  function renderStatus() {
+    const msg = {
+      "local": "Saved in this browser only",
+      "connecting": "Connecting…",
+      "signed-out": "Not signed in. Saving in this browser only",
+      "fb-error": "Couldn't load Firebase. Saving in this browser only",
+      "online-loading": "Loading your log…",
+      "online": "Synced to your account",
+      "online-error": "Can't reach the database. Changes may not save."
+    }[mode];
+    $("status").textContent = msg;
+    const showAcct = !!fbUser && mode !== "signed-out";
+    $("acct").hidden = !showAcct;
+    if (showAcct) $("acctName").textContent = (me() && me().name) || fbUser.displayName || "";
+  }
+
+  function render() {
+    if (!P()) return;
+    renderStatus();
+    $("mLabel").textContent = mLabel(view);
+    $("thisM").hidden = view === THIS_M;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(LS_DISMISS) === "1"; } catch (e) {}
+    $("signinCard").hidden = !(CFG && mode === "signed-out" && !dismissed);
+    renderPeople();
+    renderViewNote();
+    renderSetupPlacement();
+    renderSummary();
+    renderCalendar();
+    renderEntries();
+    renderFriends();
+    renderLadder();
+    renderChart();
+    renderSetupPreview();
+  }
+
+  function orderedIds() {
+    return Object.keys(people).filter(id => id !== "local").sort((a, b) => {
+      if (a === meId) return -1; if (b === meId) return 1;
+      return (people[a].name || "").localeCompare(people[b].name || "");
+    });
+  }
+
+  function renderPeople() {
+    const bar = $("people");
+    const ids = orderedIds();
+    if (!(online() && group && ids.length > 1)) { bar.hidden = true; return; }
+    bar.innerHTML = ids.map(id => {
+      const p = people[id];
+      const st = monthStatus(p, THIS_M);
+      return '<button type="button" class="who" data-who="' + esc(id) + '" aria-pressed="' + (id === viewId) + '"><span class="sdot ' + st.cls + '"></span>' + esc(nameOf(p)) + "</button>";
+    }).join("");
+    bar.hidden = false;
+  }
+
+  function renderViewNote() {
+    const mine = viewingMe();
+    $("viewNote").hidden = mine;
+    $("addPanel").hidden = !mine;
+    $("calNote").hidden = !mine;
+    $("cal").classList.toggle("readonly", !mine);
+    if (!mine) $("viewNoteText").innerHTML = "You're looking at <b>" + esc(P().name || "Friend") + "</b>'s log.";
+    $("sumH").textContent = mine ? "Standard drinks this month" : (P().name || "Friend") + "'s standard drinks";
+    $("planH").textContent = mine ? "Step-down plan" : (P().name || "Friend") + "'s step-down plan";
+  }
+
+  function renderSummary() {
+    const p = P();
+    const st = monthStatus(p, view);
+    const { t, u, isCur } = st;
+    $("big").innerHTML = '<span class="num">' + fmt1(u) + "</span>" + (t != null ? "<small>of " + t + " target</small>" : "<small>no target this month</small>");
+    $("pill").className = "pill " + st.cls; $("pill").textContent = st.txt;
+
     const stats = [];
     if (t != null) {
       const rem = t - u;
-      stats.push(rem >= 0
-        ? { l: "Left this month", v: fmt1(rem) }
-        : { l: "Over target by", v: fmt1(-rem), c: "bad" });
+      stats.push(rem >= 0 ? { l: "Left this month", v: fmt1(rem) } : { l: "Over target by", v: fmt1(-rem), c: "bad" });
       if (isCur) {
-        const daysLeft = dim - now.getDate() + 1;
+        const daysLeft = st.dim - now.getDate() + 1;
         stats.push({ l: "Room per day", v: rem > 0 ? fmt1(rem / daysLeft) : "0.0", c: rem > 0 ? "" : "bad" });
       } else stats.push({ l: "Target", v: String(t) });
     } else {
       stats.push({ l: "Logged", v: fmt1(u) });
-      stats.push({ l: "Plan starts", v: mShort(state.settings.start) });
+      stats.push({ l: "Plan starts", v: mShort(p.settings.start) });
     }
-    stats.push({ l: "Alcohol-free days", v: lastDay ? free + "/" + lastDay : "–", c: free > 0 ? "good" : "" });
-    stats.push({ l: "Days over 4", v: lastDay ? String(heavy) : "–", c: heavy > 0 ? "bad" : "" });
+    stats.push({ l: "Alcohol-free days", v: st.lastDay ? st.free + "/" + st.lastDay : "–", c: st.free > 0 ? "good" : "" });
+    stats.push({ l: "Days over 4", v: st.lastDay ? String(st.heavy) : "–", c: st.heavy > 0 ? "bad" : "" });
     $("stats").innerHTML = stats.map(s => '<div class="stat"><span class="label">' + s.l + '</span><span class="v ' + (s.c || "") + '">' + s.v + "</span></div>").join("");
 
-    // dots
     const n = Math.min(400, Math.max(Math.ceil(t || 0), Math.ceil(u)));
     let html = "";
     for (let i = 0; i < n; i++) {
-      const p = Math.max(0, Math.min(1, u - i));
-      const over = t != null && i >= t;
-      html += '<span class="dot' + (over ? " over" : "") + '" style="--p:' + p.toFixed(2) + '"></span>';
+      const fill = Math.max(0, Math.min(1, u - i));
+      html += '<span class="dot' + (t != null && i >= t ? " over" : "") + '" style="--p:' + fill.toFixed(2) + '"></span>';
     }
     $("dots").innerHTML = html;
     $("dots").hidden = n === 0;
@@ -525,7 +909,7 @@ footer a { color: var(--accent); }
 
     const wk = $("week");
     if (isCur) {
-      const w = last7();
+      const w = last7(p);
       wk.hidden = false;
       wk.className = "week" + (w > 10 ? " bad" : "");
       wk.innerHTML = "Last 7 days: <b class=\"num\">" + fmt1(w) + "</b> standard drinks. " + (w > 10 ? "That's over the guideline of 10 a week." : "The guideline is no more than 10 a week.");
@@ -533,11 +917,12 @@ footer a { color: var(--accent); }
   }
 
   function renderCalendar() {
+    const p = P();
+    const mine = viewingMe();
     const [y, m] = parseM(view);
-    const first = new Date(y, m - 1, 1);
-    const offset = (first.getDay() + 6) % 7;
+    const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
     const dim = daysIn(view);
-    const totals = dayTotals(view);
+    const totals = dayTotals(view, p);
     let html = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => '<span class="dow">' + d + "</span>").join("");
     for (let i = 0; i < offset; i++) html += '<span class="cell blank" aria-hidden="true"></span>';
     for (let d = 1; d <= dim; d++) {
@@ -545,8 +930,7 @@ footer a { color: var(--accent); }
       const v = totals[key] || 0;
       const future = key > TODAY;
       const cls = ["cell"];
-      let inner = '<span class="d">' + d + "</span>";
-      let style = "";
+      let inner = '<span class="d">' + d + "</span>", style = "";
       if (v > 0) {
         const i = Math.round(18 + Math.min(v / 6, 1) * 72);
         cls.push("has"); style = ' style="--i:' + i + '%"';
@@ -557,15 +941,21 @@ footer a { color: var(--accent); }
       if (key === TODAY) cls.push("today");
       if (future) cls.push("future");
       const label = d + " " + MONTHS[m - 1] + ": " + (future ? "upcoming" : v > 0 ? fmt1(v) + " standard drinks" : "alcohol-free");
-      html += '<button type="button" class="' + cls.join(" ") + '"' + style + ' data-day="' + key + '" aria-label="' + label + '"' + (future ? " disabled" : "") + ">" + inner + "</button>";
+      if (mine) html += '<button type="button" class="' + cls.join(" ") + '"' + style + ' data-day="' + key + '" aria-label="' + label + '"' + (future ? " disabled" : "") + ">" + inner + "</button>";
+      else html += '<span class="' + cls.join(" ") + '"' + style + ' role="img" aria-label="' + label + '">' + inner + "</span>";
     }
     $("cal").innerHTML = html;
   }
 
   function renderEntries() {
-    const list = entriesOf(view).slice().sort((a, b) => (b.d + (b.ts || "")).localeCompare(a.d + (a.ts || "")));
+    const p = P(), mine = viewingMe();
+    const list = entriesOf(view, p).slice().sort((a, b) => (b.d + (b.ts || "")).localeCompare(a.d + (a.ts || "")));
     if (!list.length) {
-      $("entries").innerHTML = '<div class="empty">' + (view > THIS_M ? "This month hasn't started yet." : "Nothing logged for " + mLabel(view) + ". Pick a drink above and press Log it.") + "</div>";
+      let msg;
+      if (view > THIS_M) msg = "This month hasn't started yet.";
+      else if (mine) msg = "Nothing logged for " + mLabel(view) + ". Pick a drink above and press Log it.";
+      else msg = esc(p.name || "Friend") + " hasn't logged anything for " + mLabel(view) + ".";
+      $("entries").innerHTML = '<div class="empty">' + msg + "</div>";
       return;
     }
     const groups = {};
@@ -576,38 +966,76 @@ footer a { color: var(--accent); }
       const dt = new Date(d + "T00:00:00");
       const head = DOW[dt.getDay()] + " " + dt.getDate() + " " + SHORT[dt.getMonth()];
       return '<div class="day"><div class="dayhead"><span>' + head + '</span><span class="num' + (tot > 4 ? " heavy" : "") + '">' + fmt1(tot) + " std" + (tot > 4 ? " · over 4" : "") + "</span></div>" +
-        items.map(e => '<div class="entry"><div class="what"><b>' + esc(e.name) + "</b><span>" + e.n + " × " + e.ml + " ml at " + e.abv + "%</span></div>" +
-          '<span class="sd">' + fmt1(+e.sd) + '</span><button type="button" class="del" data-del="' + esc(e.id) + '" aria-label="Delete ' + esc(e.name) + '">×</button></div>').join("") +
-        "</div>";
+        items.map(e => '<div class="entry"><div class="what"><b>' + esc(e.name) + "</b><span>" + esc(e.n) + " × " + esc(e.ml) + " ml at " + esc(e.abv) + "%</span></div>" +
+          '<span class="sd">' + fmt1(+e.sd) + "</span>" +
+          (mine ? '<button type="button" class="del" data-del="' + esc(e.id) + '" aria-label="Delete ' + esc(e.name) + '">×</button>' : "<span></span>") +
+          "</div>").join("") + "</div>";
     }).join("") + "</div>";
   }
 
+  function renderFriends() {
+    const show = id => ["fpNoCfg", "fpSignin", "fpLoading", "fpNoGroup", "fpGroup"].forEach(k => { $(k).hidden = k !== id; });
+    if (!CFG) return show("fpNoCfg");
+    if (mode === "fb-error") { show("fpNoCfg"); $("fpNoCfg").firstElementChild.textContent = "Couldn't load Firebase, so friends aren't available right now. Check your connection and reload."; return; }
+    if (mode === "signed-out" || mode === "connecting") return show(mode === "connecting" ? "fpLoading" : "fpSignin");
+    if (mode !== "online") return show("fpLoading");
+    if (!groupId) {
+      show("fpNoGroup");
+      if (pendingJoin && !$("gCode").value) $("gCode").value = fmtCode(pendingJoin);
+      return;
+    }
+    if (!group) return show("fpLoading");
+    show("fpGroup");
+    $("gTitle").textContent = group.name;
+    $("gCodeShow").textContent = fmtCode(group.id);
+    const ids = orderedIds();
+    $("boardLabel").textContent = mLabel(view) + " · " + ids.length + (ids.length === 1 ? " person" : " people");
+    const rows = ids.map(id => {
+      const p = people[id];
+      const st = monthStatus(p, view);
+      const ratio = st.t ? st.u / st.t : 0;
+      return { id, p, st, ratio };
+    }).sort((a, b) => a.ratio - b.ratio);
+    $("board").innerHTML = rows.map(r => {
+      const { st, p } = r;
+      const w = st.t ? Math.min(100, (st.u / st.t) * 100) : 0;
+      const loaded = p.loaded;
+      return '<button type="button" class="brow" data-who="' + esc(r.id) + '" aria-pressed="' + (r.id === viewId) + '">' +
+        '<span class="bname">' + esc(nameOf(p)) + "</span>" +
+        '<span class="pill small ' + (loaded ? st.cls : "neutral") + '">' + (loaded ? st.txt : "Loading") + "</span>" +
+        '<span class="bbar"><i class="' + (st.t != null && st.u > st.t ? "over" : "") + '" style="width:' + w.toFixed(1) + '%"></i></span>' +
+        '<span class="bstats num">' + fmt1(st.u) + (st.t != null ? " of " + st.t : "") + " · " + st.free + " free days · last 7 days " + fmt1(last7(p)) + "</span>" +
+        "</button>";
+    }).join("");
+    if (ids.length === 1) $("board").insertAdjacentHTML("beforeend", '<div class="empty">Nobody else here yet. Copy the invite link and send it to your friends.</div>');
+  }
+
   function renderLadder() {
-    const s = state.settings;
+    const p = P(), s = p.settings;
+    const top = Math.max(1, targetFor(s.start, p) || 1);
     const rows = [];
-    const startM = s.start;
-    const top = Math.max(1, targetFor(startM) || 1);
     let reached = null;
     for (let i = 0; i < 8; i++) {
-      const mk = addMonths(startM, i);
-      const t = targetFor(mk);
-      if (reached == null && t <= Math.round(+s.floor) && +s.baseline > +s.floor) reached = mk;
+      const mk = addMonths(s.start, i);
+      const t = targetFor(mk, p);
+      if (reached == null && +s.baseline > +s.floor && t <= Math.round(+s.floor)) reached = mk;
       rows.push('<div class="rung' + (mk === THIS_M ? " cur" : "") + '"><span>' + mShort(mk) + (mk === THIS_M ? " (now)" : "") + '</span><span class="bar"><i style="width:' + Math.max(2, (t / top) * 100) + '%"></i></span><span class="v">' + t + "</span></div>");
     }
     $("ladder").innerHTML = rows.join("");
-    const per = (+s.floor * 7 / (365.25 / 12));
+    const per = +s.floor * 7 / (365.25 / 12);
     let note = "Monthly targets in standard drinks, starting from " + Math.round(+s.baseline) + " and cutting " + (+s.cut) + "% each month. ";
-    if (+s.baseline <= +s.floor) note += "Your starting point is already at or under your end goal, so the target holds steady.";
-    else if (reached) note += "You reach your end goal of " + Math.round(+s.floor) + " in " + mLabel(reached) + ", about " + fmt1(per) + " a week.";
-    else note += "Your end goal of " + Math.round(+s.floor) + " (about " + fmt1(per) + " a week) comes after the months shown.";
+    if (+s.baseline <= +s.floor) note += "The starting point is already at or under the end goal, so the target holds steady.";
+    else if (reached) note += "The end goal of " + Math.round(+s.floor) + " is reached in " + mLabel(reached) + ", about " + fmt1(per) + " a week.";
+    else note += "The end goal of " + Math.round(+s.floor) + " (about " + fmt1(per) + " a week) comes after the months shown.";
     $("planNote").textContent = note;
   }
 
   function renderChart() {
+    const p = P();
     const end = view > THIS_M ? THIS_M : view;
     const months = [];
     for (let i = 5; i >= 0; i--) months.push(addMonths(end, -i));
-    const data = months.map(mk => ({ mk, u: usedFor(mk), t: targetFor(mk) }));
+    const data = months.map(mk => ({ mk, u: usedFor(mk, p), t: targetFor(mk, p) }));
     const maxV = Math.max(10, ...data.map(d => Math.max(d.u, d.t || 0)));
     const step = maxV <= 40 ? 10 : maxV <= 100 ? 20 : maxV <= 200 ? 50 : 100;
     const yMax = Math.ceil(maxV / step) * step;
@@ -627,8 +1055,7 @@ footer a { color: var(--accent); }
       if (d.t != null) svg += '<line x1="' + (cx - bw / 2 - 5) + '" x2="' + (cx + bw / 2 + 5) + '" y1="' + y(d.t) + '" y2="' + y(d.t) + '" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round"><title>Target ' + d.t + "</title></line>";
       svg += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle"' + (d.mk === view ? ' style="fill:var(--ink);font-weight:500"' : "") + ">" + SHORT[parseM(d.mk)[1] - 1] + "</text>";
     });
-    svg += "</svg>";
-    $("chart").innerHTML = svg;
+    $("chart").innerHTML = svg + "</svg>";
   }
 
   // ---------- settings / setup ----------
@@ -638,10 +1065,16 @@ footer a { color: var(--accent); }
   const setFields = $("setFields"), setDetails = $("setDetails");
 
   function renderSetupPlacement() {
-    const ready = !!state.settings.ready;
+    const mine = viewingMe();
+    const m = me();
+    const loaded = m && m.loaded;
+    settingsPanel.hidden = !mine || !loaded;
+    $("sNameWrap").hidden = !online();
+    if (!mine || !loaded) return;
+    const ready = !!m.settings.ready;
     const slot = ready ? $("settingsSlot") : $("setupSlot");
     if (settingsPanel.parentNode !== slot) slot.appendChild(settingsPanel);
-    settingsPanel.classList.toggle("setup", !ready);
+    settingsPanel.classList.toggle("feature", !ready);
     $("setupIntro").hidden = ready;
     $("setupActions").hidden = ready;
     setDetails.hidden = !ready;
@@ -649,44 +1082,57 @@ footer a { color: var(--accent); }
     else if (setFields.parentNode !== settingsPanel) settingsPanel.insertBefore(setFields, $("setupActions"));
   }
   function renderSetupPreview() {
-    if (state.settings.ready) return;
-    const s = state.settings;
-    const a = targetFor(s.start), b = targetFor(addMonths(s.start, 1)), c = targetFor(addMonths(s.start, 2));
+    const m = me();
+    if (!m || m.settings.ready || !viewingMe()) return;
+    const s = m.settings;
+    const a = targetFor(s.start, m), b = targetFor(addMonths(s.start, 1), m), c = targetFor(addMonths(s.start, 2), m);
     $("setupPreview").innerHTML = "First three targets: <span class=\"num\">" + a + " → " + b + " → " + c + "</span> standard drinks";
   }
-  function syncSettingsInputs() {
-    const s = state.settings;
+  function syncSettingsInputs(force) {
+    const m = me(); if (!m) return;
+    const active = document.activeElement;
+    if (!force && active && setFields.contains(active)) return;
+    const s = m.settings;
     $("sBase").value = s.baseline; $("sCut").value = s.cut; $("sFloor").value = s.floor; $("sStart").value = s.start;
+    $("sName").value = m.name || "";
   }
   function readSettingsInputs() {
-    const s = state.settings;
+    const s = { ...me().settings };
     const b = parseFloat($("sBase").value), c = parseFloat($("sCut").value), f = parseFloat($("sFloor").value), st = $("sStart").value;
     if (isFinite(b) && b > 0) s.baseline = Math.min(1000, b);
     if (isFinite(c) && c >= 0) s.cut = Math.min(50, c);
     if (isFinite(f) && f >= 0) s.floor = Math.min(1000, f);
     if (/^\d{4}-\d{2}$/.test(st)) s.start = st;
+    me().settings = s;
   }
   ["sBase", "sCut", "sFloor", "sStart"].forEach(id => $(id).addEventListener("input", () => {
+    if (!viewingMe()) return;
     readSettingsInputs(); render();
-    if (state.settings.ready) persistSettings(false);
+    if (me().settings.ready) persistMe({ settings: { ...me().settings } }, false);
   }));
+  $("sName").addEventListener("input", () => {
+    const n = $("sName").value.trim().slice(0, 40);
+    if (!n || !online()) return;
+    me().name = n; renderStatus(); renderPeople(); renderFriends();
+    persistMe({ name: n }, false);
+  });
   $("startBtn").addEventListener("click", () => {
     readSettingsInputs();
-    state.settings.ready = true;
-    persistSettings(true);
+    me().settings.ready = true;
+    persistMe({ settings: { ...me().settings } }, true);
     render();
-    toast("Plan started. Your target for " + mLabel(THIS_M) + " is " + (targetFor(THIS_M) ?? "set") + ".");
+    toast("Plan started. Your target for " + mLabel(THIS_M) + " is " + (targetFor(THIS_M, me()) ?? "set") + ".");
   });
 
   // ---------- add form ----------
   function renderChips() {
     $("chips").innerHTML = PRESETS.map(p => '<button type="button" class="chip" data-p="' + p.k + '" aria-pressed="' + (p.k === preset) + '"><b>' + p.name + "</b><span>" + (p.ml ? p.ml + " ml · " + p.abv + "% · " + fmt1(sdOf(p.ml, p.abv, 1)) + " std" : "Enter size and %") + "</span></button>").join("");
   }
-  function pickPreset(k) {
+  function pickPreset(k, focus) {
     preset = k;
     const p = PRESETS.find(x => x.k === k);
     if (p.ml) { $("ml").value = p.ml; $("abv").value = p.abv; }
-    else { $("ml").value = ""; $("abv").value = ""; $("ml").focus(); }
+    else { $("ml").value = ""; $("abv").value = ""; if (focus) $("ml").focus(); }
     renderChips(); updateCalc();
   }
   function formValues() {
@@ -708,7 +1154,7 @@ footer a { color: var(--accent); }
       $("addBtn").textContent = "Log it";
     }
   }
-  $("chips").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (b) pickPreset(b.dataset.p); });
+  $("chips").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if (b) pickPreset(b.dataset.p, true); });
   ["ml", "abv"].forEach(id => $(id).addEventListener("input", () => {
     const p = PRESETS.find(x => x.k === preset);
     if (p.ml && (+$("ml").value !== p.ml || +$("abv").value !== p.abv)) { preset = "custom"; renderChips(); }
@@ -721,39 +1167,74 @@ footer a { color: var(--accent); }
 
   $("addBtn").addEventListener("click", () => {
     const v = formValues();
-    if (!v.ok) return;
+    if (!v.ok || !viewingMe()) return;
+    if (mode === "online-loading" || mode === "connecting") { toast("Still loading your log. Try again in a moment."); return; }
     const p = PRESETS.find(x => x.k === preset);
     const name = preset === "custom" ? "Drink (" + v.ml + " ml, " + v.abv + "%)" : p.name;
-    const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), d: v.d, ts: new Date().toISOString(), name, ml: v.ml, abv: v.abv, n: v.n, sd: sdOf(v.ml, v.abv, v.n) };
+    const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), d: v.d, ts: isoNow(), name, ml: v.ml, abv: v.abv, n: v.n, sd: sdOf(v.ml, v.abv, v.n) };
     const mk = v.d.slice(0, 7);
-    state.months[mk] = [...entriesOf(mk), entry];
+    me().months[mk] = [...entriesOf(mk, me()), entry];
     persistMonth(mk);
     view = mk;
     $("count").value = 1;
     render(); updateCalc();
-    const dayTot = dayTotals(mk)[v.d] || 0;
+    const dayTot = dayTotals(mk, me())[v.d] || 0;
     toast("Logged " + fmt1(entry.sd) + " standard drinks." + (dayTot > 4 ? " That day is now over 4." : ""), () => removeEntry(mk, entry.id, true));
   });
 
   function removeEntry(mk, id, silent) {
-    const list = entriesOf(mk);
+    const list = entriesOf(mk, me());
     const gone = list.find(e => e.id === id);
     if (!gone) return;
-    state.months[mk] = list.filter(e => e.id !== id);
+    me().months[mk] = list.filter(e => e.id !== id);
     persistMonth(mk);
     render();
     if (!silent) toast("Deleted " + gone.name + ".", () => {
-      state.months[mk] = [...entriesOf(mk), gone];
+      me().months[mk] = [...entriesOf(mk, me()), gone];
       persistMonth(mk); render();
     });
   }
-  $("entries").addEventListener("click", e => { const b = e.target.closest("[data-del]"); if (b) removeEntry(view, b.dataset.del); });
+  $("entries").addEventListener("click", e => { const b = e.target.closest("[data-del]"); if (b && viewingMe()) removeEntry(view, b.dataset.del); });
   $("cal").addEventListener("click", e => {
+    if (!viewingMe()) return;
     const b = e.target.closest("[data-day]");
     if (!b || b.disabled) return;
     $("date").value = b.dataset.day; updateCalc();
     $("addH").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   });
+
+  // ---------- people / friends events ----------
+  function selectPerson(id) {
+    if (!people[id]) return;
+    viewId = id;
+    render();
+    if (id !== meId) window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+  $("people").addEventListener("click", e => { const b = e.target.closest("[data-who]"); if (b) selectPerson(b.dataset.who); });
+  $("board").addEventListener("click", e => { const b = e.target.closest("[data-who]"); if (b) selectPerson(b.dataset.who); });
+  $("backToMe").addEventListener("click", () => selectPerson(meId));
+  $("gCreate").addEventListener("click", createGroup);
+  $("gJoin").addEventListener("click", joinGroup);
+  $("gCode").addEventListener("keydown", e => { if (e.key === "Enter") joinGroup(); });
+  $("gName").addEventListener("keydown", e => { if (e.key === "Enter") createGroup(); });
+  $("gLeave").addEventListener("click", leaveGroup);
+  $("gCopy").addEventListener("click", copyInvite);
+
+  document.addEventListener("click", e => {
+    if (!e.target.closest("[data-signin]")) return;
+    if (!fb) { toast("Still connecting to Firebase. Try again in a moment."); return; }
+    fb.signInWithPopup(fb.auth, new fb.GoogleAuthProvider()).catch(err => {
+      const code = err && err.code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
+      if (code === "auth/popup-blocked") toast("Your browser blocked the sign-in window. Allow pop-ups for this site and try again.");
+      else if (code === "auth/unauthorized-domain") toast("This web address isn't on the Firebase authorised domains list yet (README step 3).");
+      else if (code === "auth/operation-not-allowed") toast("Google sign-in isn't switched on in Firebase yet (README step 3).");
+      else toast("Sign-in didn't work. Check your connection and try again.");
+      console.error("Jaznit: sign-in error", err);
+    });
+  });
+  $("dismissSignin").addEventListener("click", () => { try { localStorage.setItem(LS_DISMISS, "1"); } catch (e) {} render(); });
+  $("signOutBtn").addEventListener("click", () => { if (fb) fb.signOut(fb.auth); });
 
   // ---------- month nav ----------
   $("prevM").addEventListener("click", () => { view = addMonths(view, -1); render(); });
@@ -773,15 +1254,17 @@ footer a { color: var(--accent); }
   $("toastBtn").addEventListener("click", () => { if (undoFn) { const f = undoFn; undoFn = null; f(); } $("toast").hidden = true; });
 
   // ---------- boot ----------
+  const hm = /^#join-([A-Za-z0-9]{8})$/.exec(location.hash);
+  if (hm) pendingJoin = hm[1].toUpperCase();
   $("date").value = TODAY; $("date").max = TODAY;
-  const local = loadLocal();
-  if (local) state = { settings: { ...DEFAULTS, ...local.settings }, months: local.months || {} };
-  syncSettingsInputs();
-  renderChips(); pickPreset(preset);
+  useLocal();
+  renderChips(); pickPreset(preset, false);
   render();
-  connect();
+  if (CFG) {
+    if (pendingJoin) { try { localStorage.removeItem(LS_DISMISS); } catch (e) {} }
+    initFirebase();
+  }
 })();
 </script>
-
 </body>
 </html>
